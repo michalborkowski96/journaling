@@ -1,0 +1,13 @@
+abstract nojournal Iterator T {
+	fun T deref();
+
+	fun void set(T e);
+
+	fun Iterator<T> next();
+
+	fun Iterator<T> prev();
+
+	fun bool equals(Iterator<T> that);
+
+	constructor(){};
+}

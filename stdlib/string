@@ -1,0 +1,23 @@
+nojournal String {
+	fun int get(int i) {return null;};
+	fun void set(int i) {};
+	fun int size() {return null;};
+	fun void resize(int size) {};
+	fun void resize(int size, int char) {};
+	fun void clear() {};
+	fun int empty() {return null;};
+	fun void append(String s){};
+	fun void substr(int pos, int len) {};
+
+	fun String add(String s) {return null;};
+
+	fun int less(String s) {return null;};
+	fun int more(String s) {return null;};
+	fun int eq(String s) {return null;};
+	fun int neq(String s) {return null;};
+	fun int le(String s) {return null;};
+	fun int me(String s) {return null;};
+
+	constructor() {};
+	constructor(int i) {};
+}

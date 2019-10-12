@@ -1,0 +1,155 @@
+import "container"
+import "avl_"
+
+Set T : Container<T> {
+	int size_;
+	strong Comparator<T> comparator_;
+	strong AVLNode_<T> end_;
+	constructor(Comparator<T> c) {
+		comparator = c;
+		end_ = new AVLNode_<T>(null, null);
+	};
+	fun int size() {
+		return size_;
+	} noeffect;
+	fun AVLNode_<T> begin() {
+		var AVLNode_<T> b = end_;
+		while(b.left_son) {
+			b = b.left_son;
+		}
+		return b;
+	} noeffect;
+	fun AVLNode_<T> end() {
+		return end_;
+	} noeffect;
+	fun void clear() {
+		size_ = 0;
+		end_.left_son = null;
+	} irreversible;
+	fun AVLNode_<T> find(T key) {
+		if(empty()) {
+			return end_;
+		}
+		var AVLNode_<T> node = end_.left_son;
+		while(node) {
+			var T k = node.deref();
+			if(comparator_.eq(key, k)) {
+				return node;
+			}
+			if(comparator_.less(key, k)) {
+				node = node.left_son;
+			} else {
+				node = node.right_son;
+			}
+		}
+		return end_;
+	} noeffect;
+
+	fun void rebalance_(AVLNode_<T> z) {
+		var int bal = z.recalc_height();
+		if(bal == -2) {
+			if(z.left_son.recalc_height() == 1) {
+				z.left_son.left_rotate();
+			}
+			z.right_rotate();
+			z = z.parent;
+		} else  if (bal == 2) {
+			if(z.right_son.recalc_height() == -1) {
+				z.right_son.right_rotate();
+			}
+			z.left_rotate();
+			z = z.parent;
+		}
+		return z.parent;
+	} irreversible;
+
+	fun Pair<bool, T> insert(T entry) {
+		var AVLNode_<T> node = end_.left_son;
+		if(!node) {
+			end_.left_son = new AVLNode_<T>(entry, end_);
+			return new Pair<bool, T>(false, null), null, false;
+		}
+		while(true) {
+			var T k = node.deref();
+			if(comparator_.eq(entry, k)) {
+				var T old = node.deref();
+				node.set(entry);
+				return new Pair<bool, T>(true, old), old, true;
+			}
+			if(comparator_.less(entry, k)) {
+				if(node.left_son) {
+					node = node.left_son;
+				} else {
+					node.left_son = new AVLNode_<T>(entry, node);
+					node = node.left_son;
+					break;
+				}
+			} else {
+				if(node.right_son) {
+					node = node.right_son;
+				} else {
+					node.right_son = new AVLNode_<T>(entry, node);
+					node = node.right_son;
+					break;
+				}
+			}
+		}
+		var AVLNode_<T> z = node.parent;
+		while(z.parent) {
+			z = rebalance_(z);
+		}
+		return new Pair<bool, T>(false, null), null, false;
+	} dual (T old, bool had_old) {
+		if(had_old) {
+			insert(old);
+		} else {
+			erase(old);
+		}
+	};
+
+	fun Pair<bool, T> erase(K key) {
+		var AVLNode_<T> node = find(key);
+		if(node.equals(end_)) {
+			return new Pair<bool, T>(false, null), null, false;
+		}
+		var T old = node.deref();
+		if(!node.left_son && !node.right_son) {
+			if(node.parent.left_son == node) {
+				node.parent.left_son = null;
+			} else {
+				node.parent.right_son = null;
+			}
+		} else if (node.left_son && !node.right_son) {
+			if(node.parent.left_son == node) {
+				node.parent.left_son = node.left_son;
+			} else {
+				node.parent.right_son = node.left_son;
+			}
+		} else if (!node.left_son && node.right_son) {
+			if(node.parent.left_son == node) {
+				node.parent.left_son = node.right_son;
+			} else {
+				node.parent.right_son = node.right_son;
+			}
+		} else {
+			var AVLNode_<T> to_remove;
+			to_remove = node.next();
+			node.data = to_remove.deref();
+			if(to_remove.parent.left_son == to_remove) {
+				to_remove.parent.left_son = null;
+			} else {
+				to_remove.parent.right_son = null;
+			}
+			node = to_remove;
+		}
+		node = node.parent;
+		while(node.parent) {
+			node = rebalance_(node);
+		}
+		return new Pair<bool, T>(true, old), old, true;
+	} dual (T old, bool had_old) {
+		if(had_old) {
+			insert(old);
+		}
+	};
+}

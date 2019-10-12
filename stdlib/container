@@ -1,0 +1,144 @@
+import "iterator"
+import "comparator"
+
+abstract Container Element {
+	constructor(){};
+	fun bool empty() {
+		return size() == 0;
+	} noeffect;
+
+	fun int size() noeffect;
+
+	fun Iterator<Element> begin() noeffect;
+
+	fun Iterator<Element> end() noeffect;
+
+	optional {
+
+	fun bool eq(Container<T> other) {
+		if(size() != other.size()) {
+			return false;
+		}
+		Iterator<Element> it1 = begin();
+		Iterator<Element> it2 = other.begin();
+		while(!it1.eq(end())) {
+			if(!it1.deref().eq(it2.deref())) {
+				return false;
+			}
+			it1 = it1.next();
+			it2 = it2.next();
+		}
+		return true;
+	} noeffect;
+
+	}
+
+	optional {
+
+	fun bool less(Container<T> other) {
+		if(size() < other.size()) {
+			return true;
+		}
+		if(size() > other.size()) {
+			return false;
+		}
+		Iterator<Element> it1 = begin();
+		Iterator<Element> it2 = other.begin();
+		while(!it1.eq(end())) {
+			if(it1.deref().less(it2.deref())) {
+				return true;
+			}
+			if(it2.deref().less(it1.deref())) {
+				return false;
+			}
+			it1 = it1.next();
+			it2 = it2.next();
+		}
+		return false;
+	} noeffect;
+
+	}
+
+	fun bool more(T e1, T e2) {
+		return less(e2, e1);
+	};
+	fun bool eq(T e1, T e2) {
+		return !less(e1, e2) && !more(e1, e2);
+	};
+	fun bool less_eq(T e1, T e2) {
+		return less(e1, e2) || !more(e1, e2);
+	};
+	fun bool more_eq(T e1, T e2) {
+		return more(e1, e2) || !less(e1, e2);
+	};
+
+	fun void print(OutputStream o) {
+		Iterator<Element> i = begin();
+		o.print("{");
+		if(!i.eq(end())) {
+			i.deref().print(o);
+			i = i.next();
+		}
+		while(!i.eq(end())) {
+			o.print(", ");
+			i.deref().print(o);
+			i = i.next();
+		}
+		o.print("}");
+	} noeffect;
+}
+
+abstract OrderedContainer Element : Container<Element> {
+	fun Iterator<Element> insert(Iterator<Element> iter, T element) dual (Iterator<Element> iter) {
+		erase(iter);
+	};
+
+	fun Iterator<Element> erase(Iterator<Element> iter) dual (Iterator<Element> iter, T e) {
+		insert(iter, e);
+	};
+
+	fun void push_back(T e) {
+		:insert(end(), e);
+	} dual (){};
+
+	fun void pop_back() {
+		:erase(end().prev());
+	} dual (){};
+
+	fun void push_front(T e) {
+		:insert(begin(), e);
+	} dual (){};
+
+	fun void pop_front() {
+		:erase(begin());
+	} dual (){};
+
+	fun void resize(int new_size, T el) {
+		while(size() < new_size) {
+			:push_back(el);
+		}
+		while(size() > new_size) {
+			:pop_back();
+		}
+	} dual(){};
+
+	fun void sort(Comparator<T> comp) {
+		for(Iterator<Element> e1 = begin(); !e1.eq(end()); e1 = e1.next()) {
+			for(Iterator<Element> e2 = e1.next(); !e2.eq(end()); e2 = e2.next()) {
+				if(comp.less(e2.deref(), e1.deref())) {
+					var T e = e1.deref();
+					e1.set(e2.deref());
+					e2.set(e);
+				}
+			}
+		}
+	} irreversible;
+
+	optional {
+
+	fun void sort() {
+		sort(new DefaultComparator<T>());
+	} irreversible;
+
+	}
+}

@@ -1,0 +1,84 @@
+import "container"
+
+struct ListElement_ T : Iterator<T> {
+	strong T element_;
+	strong ListElement_<T> next_;
+	weak ListElement_<T> prev_;
+
+	constructor (T e, ListElement_<T> n, ListElement_<T> p) () {
+		element_ = e;
+		next_ = n;
+		prev_ = p;
+	};
+
+	fun T deref(){
+		return element_;
+	};
+
+	fun void set(T e){
+		element_ = e;
+	};
+
+	fun ListElement_<T> next() {
+		return next_;
+	};
+
+	fun ListElement_<T> prev() {
+		return prev_;
+	};
+
+	fun bool equals(Iterator<T> that) {
+		return this == that;
+	};
+}
+
+List T : OrderedContainer<T> {
+	int size_;
+	strong ListElement_<T> begin_;
+	strong ListElement_<T> end_;
+
+	constructor(){
+		end_ = new ListElement_<T>(null, null, null);
+		begin_ = end_;
+	};
+
+	fun ListElement_<T> begin() {
+		return begin_;
+	} noeffect;
+
+	fun ListElement_<T> end() {
+		return end_;
+	} noeffect;
+
+	fun int size() {
+		return size_;
+	} noeffect;
+
+	fun void clear() {
+		size_ = 0;
+		end_ = new ListElement_<T>(null);
+		begin_ = end_;
+	} irreversible;
+
+	fun ListElement_<T> insert(ListElement_<T> iter, T element) {
+		size_ = size_ + 1;
+		var ListElement_<T> n = new ListElement_<T>(element, iter, iter.prev_);
+		iter.prev_ = n;
+		if(iter.equals(begin_)) {
+			begin_ = n;
+		}
+		return n, n;
+	} dual;
+
+	fun ListElement_<T> erase(ListElement_<T> iter) {
+		size_ = size_ - 1;
+		iter.next_.prev_ = iter.prev_;
+		if(iter.prev_) {
+			iter.prev_.next_ = iter.next_;
+		} else {
+			begin = iter.next_;
+		}
+		return iter.next_, iter.next_, iter.element_;
+	} dual;
+}
+

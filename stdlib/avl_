@@ -1,0 +1,112 @@
+import "iterator"
+
+struct AVLNode_ T: Iterator<T> {
+	int height;
+	strong T data;
+	weak AVLNode_<T> parent;
+	strong AVLNode_<T> left_son;
+	strong AVLNode_<T> right_son;
+	constructor (T d, AVLNode_<T> p) {
+		data = d;
+		parent = p;
+	};
+
+	fun T deref() {
+		return data;
+	};
+
+	fun void set(T e) {
+		data = e;
+	};
+
+	fun int recalc_height() {
+		var int hl = -1;
+		if(left_son) {
+			hl = left_son.height;
+		}
+		var int hr = -1;
+		if(right_son) {
+			hr = right_son.height;
+		}
+		if(hr > hl) {
+			height = hr;
+		} else {
+			height = hl;
+		}
+		return hr - hl;
+	};
+
+	fun AVLNode_<T> next() {
+		if(right_son) {
+			var AVLNode_<T> b = right_son;
+			while(b.left_son) {
+				b = b.left_son;
+			}
+			return b;
+		}
+		var AVLNode_<T> b = parent;
+		var AVLNode_<T> d = this;
+		while(true) {
+			if(b.left_son && b.left_son == d) {
+				return b;
+			}
+			d = b;
+			b = b.parent;
+		}
+	};
+
+	fun AVLNode_<T> prev() {
+		if(left_son) {
+			var AVLNode_<T> b = left_son;
+			while(b.right_son) {
+				b = b.right_son;
+			}
+			return b;
+		}
+		var AVLNode_<T> b = parent;
+		var AVLNode_<T> d = this;
+		while(true) {
+			if(b.right_son && b.right_son == d) {
+				return b;
+			}
+			d = b.data;
+			b = b.parent;
+		}
+	};
+
+	fun void right_rotate() {
+		var AVLNode_<T> t = this;
+		var AVLNode_<T> ls = left_son;
+		ls.parent = parent;
+		left_son = ls.right_son;
+		ls.right_son = this;
+		parent = ls;
+		recalc_height();
+		parent.recalc_height();
+		if(parent.parent.left_son == this) {
+			parent.parent.left_son = parent;
+		} else {
+			parent.parent.right_son = parent;
+		}
+	};
+
+	fun void left_rotate() {
+		var AVLNode_<T> t = this;
+		var AVLNode_<T> rs = right_son;
+		rs.parent = parent;
+		right_son = rs.left_son;
+		rs.left_son = this;
+		parent = rs;
+		recalc_height();
+		parent.recalc_height();
+		if(parent.parent.left_son == this) {
+			parent.parent.left_son = parent;
+		} else {
+			parent.parent.right_son = parent;
+		}
+	};
+
+	fun bool equals(Iterator<T> that) {
+		return this == that;
+	};
+}
