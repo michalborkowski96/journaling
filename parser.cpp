@@ -151,12 +151,6 @@ namespace {
 				expression = std::make_unique<IntegerLiteral>(begin, tokens[pos].end, tokens.module[tokens[pos].end - 2]);
 				++pos;
 			},
-			LexemeType::COLON, [&]() {
-				++pos;
-				Identifier function = parse_identifier();
-				std::vector<Expression> args = parse_call_arguments();
-				expression = std::make_unique<JournaledThisCall>(begin, tokens[pos - 1].end, std::move(function), std::move(args));
-			},
 			LexemeType::IDENTIFIER, [&]() {
 				expression = std::make_unique<Identifier>(parse_identifier());
 			},
@@ -557,7 +551,7 @@ namespace {
 		PointerType parse_pointer_type() {
 			size_t begin = tokens[pos].begin;
 			Identifier name = parse_identifier();
-			std::vector<Type> parameters;
+			std::vector<VariableType> parameters;
 			if(tokens[pos].type == LexemeType::LESS) {
 				++pos;
 				while(tokens[pos].type != LexemeType::MORE) {

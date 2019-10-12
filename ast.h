@@ -58,8 +58,8 @@ namespace ast {
 
 	struct PointerType : public AstNode {
 		Identifier name;
-		std::vector<Type> parameters;
-		PointerType(size_t begin, size_t end, Identifier&& name, std::vector<Type>&& parameters);
+		std::vector<VariableType> parameters;
+		PointerType(size_t begin, size_t end, Identifier&& name, std::vector<VariableType>&& parameters);
 	};
 
 	namespace expression {
@@ -86,9 +86,7 @@ namespace ast {
 
 		struct New;
 
-		struct JournaledThisCall;
-
-		using Expression = Wrap<std::variant, std::unique_ptr, StringLiteral, IntegerLiteral, Identifier, New, Negation, Cast, Null, This, MemberAccess, FunctionCall, LazyFunctionCall, BinaryOperation, JournaledThisCall>;
+		using Expression = Wrap<std::variant, std::unique_ptr, StringLiteral, IntegerLiteral, Identifier, New, Negation, Cast, Null, This, MemberAccess, FunctionCall, LazyFunctionCall, BinaryOperation>;
 
 		struct StringLiteral : public AstNode {
 			std::string value;
@@ -99,12 +97,6 @@ namespace ast {
 			PointerType type;
 			std::vector<Expression> args;
 			New(size_t begin, size_t end, PointerType&& type, std::vector<Expression>&& args);
-		};
-
-		struct JournaledThisCall : public AstNode {
-			Identifier function;
-			std::vector<Expression> arguments;
-			JournaledThisCall(size_t begin, size_t end, Identifier&& function, std::vector<Expression>&& arguments);
 		};
 
 		struct IntegerLiteral : public AstNode {

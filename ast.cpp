@@ -20,7 +20,7 @@ This::This(size_t begin, size_t end) : AstNode(begin, end){}
 
 VoidType::VoidType(size_t begin, size_t end) : AstNode(begin, end){}
 
-PointerType::PointerType(size_t begin, size_t end, Identifier&& name, std::vector<Type>&& parameters) : AstNode(begin, end), name(std::move(name)), parameters(std::move(parameters)){}
+PointerType::PointerType(size_t begin, size_t end, Identifier&& name, std::vector<VariableType>&& parameters) : AstNode(begin, end), name(std::move(name)), parameters(std::move(parameters)){}
 
 StringLiteral::StringLiteral(size_t begin, size_t end, std::string&& value) : AstNode(begin, end), value(std::move(value)) {}
 
@@ -61,8 +61,6 @@ Continue::Continue(size_t begin, size_t end) : AstNode(begin, end) {}
 While::While(size_t begin, size_t end, Expression condition, std::unique_ptr<Block>&& body) : AstNode(begin, end), condition(std::move(condition)), body(std::move(body)) {}
 
 StatementExpression::StatementExpression(size_t begin, size_t end, Expression expression) : AstNode(begin, end), expression(std::move(expression)) {}
-
-JournaledThisCall::JournaledThisCall(size_t begin, size_t end, Identifier&& function, std::vector<Expression>&& arguments) : AstNode(begin, end), function(std::move(function)), arguments(std::move(arguments)) {}
 
 Function::Function(size_t begin, size_t end, Type&& return_type, Identifier&& name, std::vector<std::pair<VariableType, Identifier>>&& arguments, std::optional<std::unique_ptr<Block>>&& body, std::optional<FunctionKind> kind, std::optional<std::pair<std::vector<std::pair<VariableType, Identifier>>, std::unique_ptr<Block>>>&& dual) : AstNode(begin, end), return_type(std::move(return_type)), name(std::move(name)), arguments(std::move(arguments)), body(std::move(body)), kind(kind), dual(std::move(dual)){}
 

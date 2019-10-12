@@ -98,27 +98,27 @@ abstract OrderedContainer Element : Container<Element> {
 	};
 
 	fun void push_back(T e) {
-		:insert(end(), e);
+		this.insert(end(), e);
 	} dual (){};
 
 	fun void pop_back() {
-		:erase(end().prev());
+		this.erase(end().prev());
 	} dual (){};
 
 	fun void push_front(T e) {
-		:insert(begin(), e);
+		this.insert(begin(), e);
 	} dual (){};
 
 	fun void pop_front() {
-		:erase(begin());
+		this.erase(begin());
 	} dual (){};
 
 	fun void resize(int new_size, T el) {
 		while(size() < new_size) {
-			:push_back(el);
+			this.push_back(el);
 		}
 		while(size() > new_size) {
-			:pop_back();
+			this.pop_back();
 		}
 	} dual(){};
 

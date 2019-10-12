@@ -37,7 +37,7 @@ Map K V : Container<Pair<K, V>> {
 	} noeffect;
 
 	fun MapEntry_<K, V> insert(K key, V value) {
-		return :insert(new Pair<K, V>(key, value));
+		return this.insert(new Pair<K, V>(key, value));
 	} dual (){};
 
 	fun Pair<bool, Pair<K, V>> insert(Pair<K, V> entry) {
