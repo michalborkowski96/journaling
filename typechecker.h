@@ -433,9 +433,11 @@ public:
 		return true;
 	}
 	virtual std::optional<const TypeInfo*> get_member(const std::string& name) const override {
-		auto v = variables.find(name);
-		if(v != variables.end()) {
-			return v->second;
+		if(ast_data->public_variables) {
+			auto v = variables.find(name);
+			if(v != variables.end()) {
+				return v->second;
+			}
 		}
 
 		auto f = get_function(name);
