@@ -717,6 +717,214 @@ BuiltinIntFunctionInfo::BuiltinIntFunctionInfo(const TypeInfo* int_type, const c
 
 RealFunctionInfo::RealFunctionInfo(std::string name, const TypeInfo* return_type, std::vector<const TypeInfo*> arguments, const Function* declaration_ast, std::optional<const Function*> body_ast, std::optional<const std::pair<std::vector<std::pair<VariableType, Identifier>>, std::unique_ptr<statement::Block>>*> dual_ast) : name(move(name)), return_type(std::move(return_type)), type_info_data(std::make_unique<FunctionalTypeInfo>(this)), arguments(move(arguments)), declaration_ast(declaration_ast), body_ast(body_ast), dual_ast(dual_ast) {}
 
+std::optional<ExpressionCheckResult> check_expression(std::vector<TypeError>& errors, const std::map<std::string, const TypeInfo*>& variable_map, ClassDatabase& class_database, const Expression& e) {
+	auto check_expr = [&](const Expression& e) {
+		return check_expression(errors, variable_map, class_database, e);
+	};
+	return std::visit(overload(
+	[&](const std::unique_ptr<StringLiteral>& e)->std::optional<ExpressionCheckResult>{
+		auto t = class_database.get_for_string();
+		if(t) {
+			return ExpressionCheckResult(*t, false);
+		}
+		errors.emplace_back(*e, "String library required to use string literals.");
+		return std::nullopt;
+	},
+	[&](const std::unique_ptr<IntegerLiteral>&)->std::optional<ExpressionCheckResult>{
+		return ExpressionCheckResult(class_database.get_for_int(), false);
+	},
+	[&](const std::unique_ptr<Identifier>& e)->std::optional<ExpressionCheckResult>{
+		auto t = variable_map.find(e->name);
+		if(t == variable_map.end()) {
+			errors.emplace_back(*e, "Identifier not found in current context.");
+			return std::nullopt;
+		}
+		return ExpressionCheckResult(t->second, true);
+	},
+	[&](const std::unique_ptr<New>& e)->std::optional<ExpressionCheckResult>{
+		const RealClassInfo* t;
+		call_with_error_log(errors, class_database.get(e->type), [&](auto tt){t = tt;});
+		if(!t) {
+			return std::nullopt;
+		}
+		std::vector<const TypeInfo*> args;
+		for(const Expression& arg : e->args) {
+			auto type = check_expr(arg);
+			if(type) {
+				args.push_back(type->type_info());
+			}
+		}
+		if(t->constructible_with(args)) {
+			return ExpressionCheckResult(t, false);
+		} else {
+			errors.emplace_back(*e, "Type " + t->full_name() + " not constructible with arguments " + types_to_string(args) + ".");
+			return std::nullopt;
+		}
+	},
+	[&](const std::unique_ptr<Negation>& e)->std::optional<ExpressionCheckResult>{
+		auto t = check_expr(e->value);
+		if(!t) {
+			return std::nullopt;
+		}
+		const char* fun_name = e->boolean ? NEG_FUN_NAME : OPP_FUN_NAME;
+		auto tt = t->type_info()->get_member(fun_name);
+		if(!tt) {
+			errors.emplace_back(*e, "Type " + t->type_info()->full_name() + " doesn't have member " + fun_name);
+			return std::nullopt;
+		}
+		auto result = (**tt).call_with({});
+		if(result) {
+			return ExpressionCheckResult(*result, false);
+		}
+		errors.emplace_back(*e, "Type " + (**tt).full_name() + " cannot be called with ().");
+		return std::nullopt;
+	},
+	[&](const std::unique_ptr<Cast>& e)->std::optional<ExpressionCheckResult>{
+		auto et = check_expr(e->value);
+		const RealClassInfo* tt;
+		call_with_error_log(errors, class_database.get(e->target_type), [&](const RealClassInfo* t){tt = t;});
+		if(!et || !tt) {
+			return std::nullopt;
+		}
+		if(!et->type_info()->explicitly_convertible_to(tt)) {
+			errors.emplace_back(*e, "Explicit cast of type " + et->type_info()->full_name() + " to " + tt->full_name() + " not possible.");
+			return std::nullopt;
+		}
+		return ExpressionCheckResult(tt, false);
+	},
+	[&](const std::unique_ptr<Null>&)->std::optional<ExpressionCheckResult>{
+		return ExpressionCheckResult(class_database.get_for_null(), false);
+	},
+	[&](const std::unique_ptr<This>&)->std::optional<ExpressionCheckResult>{
+		return ExpressionCheckResult(variable_map.at(THIS_NAME), false);
+	},
+	[&](const std::unique_ptr<MemberAccess>& e)->std::optional<ExpressionCheckResult>{
+		auto t = check_expr(e->object);
+		if(!t) {
+			return std::nullopt;
+		}
+		auto tt = t->type_info()->get_member(e->member.name);
+		if(!tt) {
+			errors.emplace_back(*e, "Type " + t->type_info()->full_name() + " doesn't have member " + e->member.name);
+		}
+		return ExpressionCheckResult(*tt, true);
+	},
+	[&](const std::unique_ptr<FunctionCall>& e)->std::optional<ExpressionCheckResult>{
+		auto t = check_expr(e->function);
+		std::vector<const TypeInfo*> args;
+		for(const Expression& ee : e->arguments) {
+			auto tt = check_expr(ee);
+			if(tt) {
+				args.push_back(tt->type_info());
+			}
+		}
+		if(args.size() != e->arguments.size() || !t) {
+			return std::nullopt;
+		}
+		auto result = t->type_info()->call_with(args);
+		if(result) {
+			return ExpressionCheckResult(*result, false);
+		}
+		errors.emplace_back(*e, "Type " + t->type_info()->full_name() + " cannot be called with (" + types_to_string(args) + ").");
+		return std::nullopt;
+	},
+	[&](const std::unique_ptr<LazyFunctionCall>& e)->std::optional<ExpressionCheckResult>{
+		auto t = check_expr(e->function);
+		std::vector<const TypeInfo*> args;
+		for(const auto&[expr, is_non_journal] : e->arguments) {
+			auto tt = check_expr(expr);
+			if(tt) {
+				if(!tt->type_info()->check_nojournal_mark(is_non_journal)) {
+					if(is_non_journal) {
+						errors.emplace_back(expr, "Expression marked as non-journalable for a lazy call, but type supports journaling.");
+					} else {
+						errors.emplace_back(expr, "Type used in lazy call doesn't support journaling. If you know what you're doing use the ':' mark to silence this error.");
+					}
+				} else {
+					args.push_back(std::move(tt->type_info()));
+				}
+			}
+		}
+		if(args.size() != e->arguments.size() || !t) {
+			return std::nullopt;
+		}
+		auto result = t->type_info()->call_with(args);
+		if(result) {
+			return ExpressionCheckResult(*result, false);
+		}
+		errors.emplace_back(*e, "Type " + t->type_info()->full_name() + " cannot be called with (" + types_to_string(args) + ").");
+		return std::nullopt;
+	},
+	[&](const std::unique_ptr<BinaryOperation>& e)->std::optional<ExpressionCheckResult>{
+		auto left = check_expr(e->left);
+		auto right = check_expr(e->right);
+		if(!left || !right) {
+			return std::nullopt;
+		}
+		std::string function_name;
+		switch(e->type) {
+		case BinaryOperationType::MUL:
+			function_name = MUL_FUN_NAME;
+			break;
+		case BinaryOperationType::DIV:
+			function_name = DIV_FUN_NAME;
+			break;
+		case BinaryOperationType::ADD:
+			function_name = ADD_FUN_NAME;
+			break;
+		case BinaryOperationType::SUB:
+			function_name = SUB_FUN_NAME;
+			break;
+		case BinaryOperationType::OR:
+			function_name = OR_FUN_NAME;
+			break;
+		case BinaryOperationType::AND:
+			function_name = AND_FUN_NAME;
+			break;
+		case BinaryOperationType::MOD:
+			function_name = MOD_FUN_NAME;
+			break;
+		case BinaryOperationType::LESS:
+			function_name = LESS_FUN_NAME;
+			break;
+		case BinaryOperationType::LESS_EQUAL:
+			function_name = LESS_EQUAL_FUN_NAME;
+			break;
+		case BinaryOperationType::MORE:
+			function_name = MORE_FUN_NAME;
+			break;
+		case BinaryOperationType::MORE_EQUAL:
+			function_name = MORE_EQUAL_FUN_NAME;
+			break;
+		case BinaryOperationType::EQUAL:
+			break;
+		case BinaryOperationType::NOT_EQUAL:
+			break;
+		default:
+			throw std::runtime_error("Internal error.");
+		}
+		if(!function_name.empty()) {
+			auto f = left->type_info()->get_member(function_name);
+			if(!f) {
+				errors.emplace_back(*e, "Type " + left->type_info()->full_name() + " doesn't have member " + function_name);
+				return std::nullopt;
+			}
+			auto result = (**f).call_with({right->type_info()});
+			if(result) {
+				return ExpressionCheckResult(*result, false);
+			}
+			errors.emplace_back(*e, "Type " + (**f).full_name() + " cannot be called with (" + right->type_info()->full_name() + ").");
+			return std::nullopt;
+		} else {
+			if(!left->type_info()->comparable_with(right->type_info())) {
+				errors.emplace_back(*e, "Types " + left->type_info()->full_name() + " and " + right->type_info()->full_name() + " cannot be compared using the '==' sign.");
+			}
+			return ExpressionCheckResult(class_database.get_for_int(), false);
+		}
+	}
+	),e);
+}
+
 std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std::string, const TypeInfo*> variable_map, ClassDatabase& class_database) const {
 	std::vector<TypeError> errors;
 	std::vector<std::set<std::string>> variable_stack;
@@ -744,215 +952,12 @@ std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std:
 		variable_stack.pop_back();
 	};
 
-	std::function<std::optional<ExpressionCheckResult>(const Expression&)> check_expression;
-
 	auto get_type_convertibility_error = [&](const std::string& a, const std::string& b){
 		return "Type " + a + " not convertible to " + b + ".";
 	};
 
-	check_expression = [&](const Expression& e)->std::optional<ExpressionCheckResult>{
-		return std::visit(overload(
-		[&](const std::unique_ptr<StringLiteral>& e)->std::optional<ExpressionCheckResult>{
-			auto t = class_database.get_for_string();
-			if(t) {
-				return ExpressionCheckResult(*t, false);
-			}
-			errors.emplace_back(*e, "String library required to use string literals.");
-			return std::nullopt;
-		},
-		[&](const std::unique_ptr<IntegerLiteral>&)->std::optional<ExpressionCheckResult>{
-			return ExpressionCheckResult(class_database.get_for_int(), false);
-		},
-		[&](const std::unique_ptr<Identifier>& e)->std::optional<ExpressionCheckResult>{
-			auto t = variable_map.find(e->name);
-			if(t == variable_map.end()) {
-				errors.emplace_back(*e, "Identifier not found in current context.");
-				return std::nullopt;
-			}
-			return ExpressionCheckResult(t->second, true);
-		},
-		[&](const std::unique_ptr<New>& e)->std::optional<ExpressionCheckResult>{
-			const RealClassInfo* t;
-			call_with_error_log(errors, class_database.get(e->type), [&](auto tt){t = tt;});
-			if(!t) {
-				return std::nullopt;
-			}
-			std::vector<const TypeInfo*> args;
-			for(const Expression& arg : e->args) {
-				auto type = check_expression(arg);
-				if(type) {
-					args.push_back(type->type_info());
-				}
-			}
-			if(t->constructible_with(args)) {
-				return ExpressionCheckResult(t, false);
-			} else {
-				errors.emplace_back(*e, "Type " + t->full_name() + " not constructible with arguments " + types_to_string(args) + ".");
-				return std::nullopt;
-			}
-		},
-		[&](const std::unique_ptr<Negation>& e)->std::optional<ExpressionCheckResult>{
-			auto t = check_expression(e->value);
-			if(!t) {
-				return std::nullopt;
-			}
-			const char* fun_name = e->boolean ? NEG_FUN_NAME : OPP_FUN_NAME;
-			auto tt = t->type_info()->get_member(fun_name);
-			if(!tt) {
-				errors.emplace_back(*e, "Type " + t->type_info()->full_name() + " doesn't have member " + fun_name);
-				return std::nullopt;
-			}
-			auto result = (**tt).call_with({});
-			if(result) {
-				return ExpressionCheckResult(*result, false);
-			}
-			errors.emplace_back(*e, "Type " + (**tt).full_name() + " cannot be called with ().");
-			return std::nullopt;
-		},
-		[&](const std::unique_ptr<Cast>& e)->std::optional<ExpressionCheckResult>{
-			auto et = check_expression(e->value);
-			const RealClassInfo* tt;
-			call_with_error_log(errors, class_database.get(e->target_type), [&](const RealClassInfo* t){tt = t;});
-			if(!et || !tt) {
-				return std::nullopt;
-			}
-			if(!et->type_info()->explicitly_convertible_to(tt)) {
-				errors.emplace_back(*e, "Explicit cast of type " + et->type_info()->full_name() + " to " + tt->full_name() + " not possible.");
-				return std::nullopt;
-			}
-			return ExpressionCheckResult(tt, false);
-		},
-		[&](const std::unique_ptr<Null>&)->std::optional<ExpressionCheckResult>{
-			return ExpressionCheckResult(class_database.get_for_null(), false);
-		},
-		[&](const std::unique_ptr<This>&)->std::optional<ExpressionCheckResult>{
-			return ExpressionCheckResult(variable_map.at(THIS_NAME), false);
-		},
-		[&](const std::unique_ptr<MemberAccess>& e)->std::optional<ExpressionCheckResult>{
-			auto t = check_expression(e->object);
-			if(!t) {
-				return std::nullopt;
-			}
-			auto tt = t->type_info()->get_member(e->member.name);
-			if(!tt) {
-				errors.emplace_back(*e, "Type " + t->type_info()->full_name() + " doesn't have member " + e->member.name);
-			}
-			return ExpressionCheckResult(*tt, true);
-		},
-		[&](const std::unique_ptr<FunctionCall>& e)->std::optional<ExpressionCheckResult>{
-			auto t = check_expression(e->function);
-			std::vector<const TypeInfo*> args;
-			for(const Expression& ee : e->arguments) {
-				auto tt = check_expression(ee);
-				if(tt) {
-					args.push_back(tt->type_info());
-				}
-			}
-			if(args.size() != e->arguments.size() || !t) {
-				return std::nullopt;
-			}
-			auto result = t->type_info()->call_with(args);
-			if(result) {
-				return ExpressionCheckResult(*result, false);
-			}
-			errors.emplace_back(*e, "Type " + t->type_info()->full_name() + " cannot be called with (" + types_to_string(args) + ").");
-			return std::nullopt;
-		},
-		[&](const std::unique_ptr<LazyFunctionCall>& e)->std::optional<ExpressionCheckResult>{
-			auto t = check_expression(e->function);
-			std::vector<const TypeInfo*> args;
-			for(const auto&[expr, is_non_journal] : e->arguments) {
-				auto tt = check_expression(expr);
-				if(tt) {
-					if(!tt->type_info()->check_nojournal_mark(is_non_journal)) {
-						if(is_non_journal) {
-							errors.emplace_back(expr, "Expression marked as non-journalable for a lazy call, but type supports journaling.");
-						} else {
-							errors.emplace_back(expr, "Type used in lazy call doesn't support journaling. If you know what you're doing use the ':' mark to silence this error.");
-						}
-					} else {
-						args.push_back(std::move(tt->type_info()));
-					}
-				}
-			}
-			if(args.size() != e->arguments.size() || !t) {
-				return std::nullopt;
-			}
-			auto result = t->type_info()->call_with(args);
-			if(result) {
-				return ExpressionCheckResult(*result, false);
-			}
-			errors.emplace_back(*e, "Type " + t->type_info()->full_name() + " cannot be called with (" + types_to_string(args) + ").");
-			return std::nullopt;
-		},
-		[&](const std::unique_ptr<BinaryOperation>& e)->std::optional<ExpressionCheckResult>{
-			auto left = check_expression(e->left);
-			auto right = check_expression(e->right);
-			if(!left || !right) {
-				return std::nullopt;
-			}
-			std::string function_name;
-			switch(e->type) {
-			case BinaryOperationType::MUL:
-				function_name = MUL_FUN_NAME;
-				break;
-			case BinaryOperationType::DIV:
-				function_name = DIV_FUN_NAME;
-				break;
-			case BinaryOperationType::ADD:
-				function_name = ADD_FUN_NAME;
-				break;
-			case BinaryOperationType::SUB:
-				function_name = SUB_FUN_NAME;
-				break;
-			case BinaryOperationType::OR:
-				function_name = OR_FUN_NAME;
-				break;
-			case BinaryOperationType::AND:
-				function_name = AND_FUN_NAME;
-				break;
-			case BinaryOperationType::MOD:
-				function_name = MOD_FUN_NAME;
-				break;
-			case BinaryOperationType::LESS:
-				function_name = LESS_FUN_NAME;
-				break;
-			case BinaryOperationType::LESS_EQUAL:
-				function_name = LESS_EQUAL_FUN_NAME;
-				break;
-			case BinaryOperationType::MORE:
-				function_name = MORE_FUN_NAME;
-				break;
-			case BinaryOperationType::MORE_EQUAL:
-				function_name = MORE_EQUAL_FUN_NAME;
-				break;
-			case BinaryOperationType::EQUAL:
-				break;
-			case BinaryOperationType::NOT_EQUAL:
-				break;
-			default:
-				throw std::runtime_error("Internal error.");
-			}
-			if(!function_name.empty()) {
-				auto f = left->type_info()->get_member(function_name);
-				if(!f) {
-					errors.emplace_back(*e, "Type " + left->type_info()->full_name() + " doesn't have member " + function_name);
-					return std::nullopt;
-				}
-				auto result = (**f).call_with({right->type_info()});
-				if(result) {
-					return ExpressionCheckResult(*result, false);
-				}
-				errors.emplace_back(*e, "Type " + (**f).full_name() + " cannot be called with (" + right->type_info()->full_name() + ").");
-				return std::nullopt;
-			} else {
-				if(!left->type_info()->comparable_with(right->type_info())) {
-					errors.emplace_back(*e, "Types " + left->type_info()->full_name() + " and " + right->type_info()->full_name() + " cannot be compared using the '==' sign.");
-				}
-				return ExpressionCheckResult(class_database.get_for_int(), false);
-			}
-		}
-		),e);
+	auto check_expr = [&](const Expression& e) {
+		return check_expression(errors, variable_map, class_database, e);
 	};
 
 	std::function<bool(const Statement&, bool)> check_statement;
@@ -1004,13 +1009,13 @@ std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std:
 			return false;
 		},
 		[&](const std::unique_ptr<StatementExpression>& s) {
-			check_expression(s->expression);
+			check_expr(s->expression);
 			return false;
 		},
 		[&](const std::unique_ptr<For>& s) {
 			variable_stack.emplace_back();
 			check_statement(s->before, in_loop);
-			auto condition_type = check_expression(s->condition);
+			auto condition_type = check_expr(s->condition);
 			if(condition_type) {
 				if(!condition_type->type_info()->implicitly_convertible_to(class_database.get_for_int())) {
 					errors.emplace_back(s->condition, get_type_convertibility_error(condition_type->type_info()->full_name(), "int"));
@@ -1025,7 +1030,7 @@ std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std:
 			call_with_error_log(errors, class_database.get(s->type), [&](const TypeInfo* t){
 				add_variable(s->name, t);
 				if(s->value) {
-					auto v = check_expression(*s->value);
+					auto v = check_expr(*s->value);
 					if(v && !v->type_info()->implicitly_convertible_to(t)) {
 						errors.emplace_back(*s->value, get_type_convertibility_error(v->type_info()->full_name(), t->full_name()));
 					}
@@ -1041,13 +1046,13 @@ std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std:
 				return true;
 			}
 			if(direct) {
-				auto t = check_expression(s->values[0]);
+				auto t = check_expr(s->values[0]);
 				if(t && !t->type_info()->implicitly_convertible_to(return_type)) {
 					errors.emplace_back(s->values[0], get_type_convertibility_error(t->type_info()->full_name(), return_type->full_name()));
 				}
 			}
 			for(size_t i = direct; i < dual_args; ++i) {
-				auto t = check_expression(s->values[i]);
+				auto t = check_expr(s->values[i]);
 				if(t && !t->type_info()->implicitly_convertible_to((*dual)[i - direct])) {
 					errors.emplace_back(s->values[i], get_type_convertibility_error(t->type_info()->full_name(), (*dual)[i - direct]->full_name()));
 				}
@@ -1055,7 +1060,7 @@ std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std:
 			return true;
 		},
 		[&](const std::unique_ptr<If>& s) {
-			auto condition_type = check_expression(s->condition);
+			auto condition_type = check_expr(s->condition);
 			if(condition_type) {
 				if(!condition_type->type_info()->implicitly_convertible_to(class_database.get_for_int())) {
 					errors.emplace_back(s->condition, get_type_convertibility_error(condition_type->type_info()->full_name(), "int"));
@@ -1070,7 +1075,7 @@ std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std:
 			return returns;
 		},
 		[&](const std::unique_ptr<While>& s) {
-			auto condition_type = check_expression(s->condition);
+			auto condition_type = check_expr(s->condition);
 			if(condition_type) {
 				if(!condition_type->type_info()->implicitly_convertible_to(class_database.get_for_int())) {
 					errors.emplace_back(s->condition, get_type_convertibility_error(condition_type->type_info()->full_name(), "int"));
@@ -1080,8 +1085,8 @@ std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std:
 			return false;
 		},
 		[&](const std::unique_ptr<Assignment>& s) {
-			auto var = check_expression(s->variable);
-			auto val = check_expression(s->value);
+			auto var = check_expr(s->variable);
+			auto val = check_expr(s->value);
 			if(var && val) {
 				if(!var->is_lvalue()) {
 					errors.emplace_back(*s, "Expected lvalue as left side of assignment.");
