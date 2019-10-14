@@ -70,6 +70,25 @@ void call_with_error_log(std::vector<TypeError>& errors, const std::variant<T, s
 	}), data);
 }
 
+void call_with_error_log(std::vector<TypeError>& errors, std::optional<std::vector<TypeError>>&& err){
+	if(err) {
+		for(const TypeError& e : *err) {
+			errors.push_back(std::move(e));
+		}
+	}
+}
+
+template<typename U>
+void call_with_error_log(std::vector<TypeError>& errors, std::optional<std::vector<TypeError>>&& err, U action_success){
+	if(err) {
+		for(const TypeError& e : *err) {
+			errors.push_back(std::move(e));
+		}
+	} else {
+		action_success();
+	}
+}
+
 class TypeInfo;
 class RealClassInfo;
 class NullTypeInfo;
@@ -387,6 +406,9 @@ public:
 	virtual ~TemplateUnknownTypeInfo() = default;
 };
 
+std::optional<ExpressionCheckResult> check_expression(std::vector<TypeError>& errors, const std::map<std::string, const TypeInfo*>& variable_map, ClassDatabase& class_database, const Expression& e);
+std::optional<std::vector<TypeError>> check_function_block(const TypeInfo* return_type, const std::optional<std::vector<const TypeInfo*>>& dual, std::map<std::string, const TypeInfo*>& variable_map, ClassDatabase& class_database, const Block& block);
+
 class RealClassInfo : public TypeInfo {
 	std::vector<const TypeInfo*> parameters;
 	std::optional<const RealClassInfo*> superclass;
@@ -432,6 +454,9 @@ public:
 		}
 		return true;
 	}
+	std::optional<const RealClassInfo*> get_superclass() const {
+		return superclass;
+	}
 	virtual std::optional<const TypeInfo*> get_member(const std::string& name) const override {
 		if(ast_data->public_variables) {
 			auto v = variables.find(name);
@@ -449,9 +474,9 @@ public:
 	virtual bool check_nojournal_mark(bool mark) const override {
 		return mark == ast_data->nojournal;
 	}
-	static std::variant<std::unique_ptr<RealClassInfo>, std::vector<TypeError>> make_class(ClassDatabase& class_database, const Class* ast) {
+	static std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, std::vector<TypeError>> make_class(ClassDatabase& class_database, const Class* ast) {
 		std::vector<TypeError> errors;
-		std::shared_ptr<RealClassInfo> type_info;
+		std::unique_ptr<RealClassInfo> type_info;
 		{
 			std::optional<const RealClassInfo*> superclass;
 			if(ast->superclass) {
@@ -476,7 +501,7 @@ public:
 				return errors;
 			}
 
-			type_info = std::shared_ptr<RealClassInfo>(new RealClassInfo(move(parameters), superclass, ast));
+			type_info = std::unique_ptr<RealClassInfo>(new RealClassInfo(move(parameters), superclass, ast));
 		}
 
 		auto temp = class_database.insert_temporary_type(type_info.get());
@@ -562,15 +587,11 @@ public:
 					overridden = (**type_info->superclass).get_function(f.name.name);
 				}
 				call_with_error_log(errors, RealFunctionInfo::make_function_declaration(overridden, class_database, &f), [&](std::unique_ptr<RealFunctionInfo>&& fi){
-					auto e = verify_function_declaration(false, f, *fi);
-					if(e) {
-						for(TypeError& err : *e) {
-							errors.emplace_back(std::move(err));
-						}
-					} else {
-						type_info->functions.insert(std::make_pair(f.name.name, std::move(fi)));
-					}
+					call_with_error_log(errors, verify_function_declaration(false, f, *fi), [&](){type_info->functions.insert(std::make_pair(f.name.name, std::move(fi)));});
 				});
+			}
+			if(!errors.empty()) {
+				return errors;
 			}
 		}
 
@@ -596,17 +617,98 @@ public:
 		}
 
 		for(const auto&[name, f] : type_info->functions) {
-			auto e = f->check_body(base_variables, class_database);
-			if(e) {
-				for(TypeError& ee : *e) {
-					errors.push_back(std::move(ee));
+			call_with_error_log(errors, f->check_body(base_variables, class_database));
+		}
+
+		auto check_constructor_body = [&errors, &base_variables, &class_database, &superclass = type_info->superclass](const Constructor& ast, const std::vector<const TypeInfo*>& args){
+			auto variable_map = base_variables;
+			std::map<std::string, const TypeInfo*> superclass_call_variable_map;
+			auto add_variable = [&](const Identifier& name, const TypeInfo* type){
+				if(variable_map.find(name.name) != variable_map.end()) {
+					errors.emplace_back(name, "Variable redefinition.");
+					return;
+				}
+				variable_map.insert(std::make_pair(name.name, type));
+				superclass_call_variable_map.insert(std::make_pair(name.name, type));
+			};
+			for(size_t i = 0; i < args.size(); ++i) {
+				add_variable(ast.arguments[i].second, args[i]);
+			}
+			if(superclass) {
+				const RealClassInfo* s = *superclass;
+				if(!ast.superclass_call) {
+					errors.emplace_back(ast.begin, ast.body->begin, "Constructor of the derived class doesn't call superclass constructor.");
+				} else {
+					std::vector<const TypeInfo*> superclass_call_args;
+					for(const Expression& e : *ast.superclass_call) {
+						auto t = check_expression(errors, superclass_call_variable_map, class_database, e);
+						if(t) {
+							superclass_call_args.push_back(t->type_info());
+						}
+					}
+					if(superclass_call_args.size() == ast.superclass_call->size() && !s->constructible_with(superclass_call_args)){
+						errors.emplace_back(ast.begin, ast.body->begin, "Superclass cannot be constructed with arguments " + types_to_string(args) + ".");
+					}
+				}
+			} else {
+				if(ast.superclass_call) {
+					errors.emplace_back(ast.begin, ast.body->begin, "Constructor calls superclass constructor, but this class has no base class.");
+				}
+			}
+			call_with_error_log(errors, check_function_block(class_database.get_for_void(), std::nullopt, variable_map, class_database, *ast.body));
+		};
+
+		for(const Constructor& c : ast->constructors) {
+			check_constructor_body(c, type_info->constructors.at(c.arguments.size()));
+		}
+		std::vector<TypeError> optional_errors;
+		for(const std::vector<Function>& funs : ast->optional_functions) {
+			size_t errors_size = optional_errors.size();
+			std::map<std::string, std::unique_ptr<RealFunctionInfo>> optional_functions;
+			for(const Function& f : funs) {
+				std::optional<const RealFunctionInfo*> overridden;
+				if(type_info->superclass) {
+					overridden = (**type_info->superclass).get_function(f.name.name);
+				}
+				call_with_error_log(optional_errors, RealFunctionInfo::make_function_declaration(overridden, class_database, &f), [&](std::unique_ptr<RealFunctionInfo>&& fi){
+					call_with_error_log(optional_errors, verify_function_declaration(true, f, *fi), [&](){
+						if(optional_functions.find(f.name.name) != optional_functions.end()) {
+							optional_errors.emplace_back(f.name, "Optional function shadows another optional function in same group.");
+						} else {
+							optional_functions.insert(std::make_pair(f.name.name, std::move(fi)));
+						}
+					});
+				});
+			}
+			if(optional_errors.size() != errors_size) {
+				continue;
+			}
+			for(auto& [name, ptr] : optional_functions) {
+				type_info->functions.insert(std::make_pair(name, std::move(ptr)));
+			}
+			for(const auto& [fname, null_ptr] : optional_functions) {
+				const auto&[name, f] = *type_info->functions.find(fname);
+				if(base_variables.find(name) != base_variables.end()) {
+					throw std::runtime_error("Internal error.");
+				}
+				base_variables.insert(std::make_pair(name, f->type_info()));
+			}
+			for(const auto& [fname, null_ptr] : optional_functions) {
+				const auto&[name, f] = *type_info->functions.find(fname);
+				call_with_error_log(optional_errors, f->check_body(base_variables, class_database));
+			}
+			if(optional_errors.size() != errors_size) {
+				for(const auto& [fname, null_ptr] : optional_functions) {
+					const auto&[name, f] = *type_info->functions.find(fname);
+					base_variables.erase(name);
+					type_info->functions.erase(name);
 				}
 			}
 		}
-
-#warning		verify_constructor_body_and_superclass_call;
-
-#warning		add_optional_functions;
+		if(!errors.empty()) {
+			return errors;
+		}
+		return std::make_pair(move(type_info), move(optional_errors));
 	}
 	std::optional<const RealFunctionInfo*> get_function(const std::string& name) const {
 		auto f = functions.find(name);
@@ -925,7 +1027,7 @@ std::optional<ExpressionCheckResult> check_expression(std::vector<TypeError>& er
 	),e);
 }
 
-std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std::string, const TypeInfo*> variable_map, ClassDatabase& class_database) const {
+std::optional<std::vector<TypeError>> check_function_block(const TypeInfo* return_type, const std::optional<std::vector<const TypeInfo*>>& dual, std::map<std::string, const TypeInfo*>& variable_map, ClassDatabase& class_database, const Block& block){
 	std::vector<TypeError> errors;
 	std::vector<std::set<std::string>> variable_stack;
 	auto add_variable_do = [&](const Identifier& name, const TypeInfo* type){
@@ -933,6 +1035,7 @@ std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std:
 			errors.emplace_back(name, "Variable redefinition.");
 			return;
 		}
+		variable_stack[variable_stack.size() - 1].insert(name.name);
 		variable_map.insert(std::make_pair(name.name, type));
 	};
 
@@ -962,7 +1065,7 @@ std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std:
 
 	std::function<bool(const Statement&, bool)> check_statement;
 
-	auto check_block = [&](const Block& block, bool in_loop){
+	auto check_blk = [&](const Block& block, bool in_loop){
 		bool returns = false;
 		variable_stack.emplace_back();
 		for(const auto& s : block.statements) {
@@ -972,17 +1075,6 @@ std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std:
 		remove_last_variable_block();
 		return returns;
 	};
-
-	std::optional<std::vector<const TypeInfo*>> dual;
-
-	if(dual_ast) {
-		dual = std::vector<const TypeInfo*>{};
-		for(const auto&[type, name] : (**dual_ast).first) {
-			call_with_error_log(errors, class_database.get(type), [&](const TypeInfo* t){
-				dual->push_back(t);
-			});
-		}
-	}
 
 	if(!errors.empty()) {
 		return errors;
@@ -1003,7 +1095,7 @@ std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std:
 			return false;
 		},
 		[&](const std::unique_ptr<Block>& s) {
-			return check_block(*s, in_loop);
+			return check_blk(*s, in_loop);
 		},
 		[&](const std::unique_ptr<Empty>&) {
 			return false;
@@ -1022,7 +1114,7 @@ std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std:
 				}
 			}
 			check_statement(s->after, in_loop);
-			check_block(*s->body, true);
+			check_blk(*s->body, true);
 			remove_last_variable_block();
 			return false;
 		},
@@ -1066,9 +1158,9 @@ std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std:
 					errors.emplace_back(s->condition, get_type_convertibility_error(condition_type->type_info()->full_name(), "int"));
 				}
 			}
-			bool returns = check_block(*s->body, in_loop);
+			bool returns = check_blk(*s->body, in_loop);
 			if(s->body_else) {
-				returns &= check_block(**s->body_else, in_loop);
+				returns &= check_blk(**s->body_else, in_loop);
 			} else {
 				returns = false;
 			}
@@ -1081,7 +1173,7 @@ std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std:
 					errors.emplace_back(s->condition, get_type_convertibility_error(condition_type->type_info()->full_name(), "int"));
 				}
 			}
-			check_block(*s->body, true);
+			check_blk(*s->body, true);
 			return false;
 		},
 		[&](const std::unique_ptr<Assignment>& s) {
@@ -1100,25 +1192,75 @@ std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std:
 		), statement);
 	};
 
+	bool returns = check_blk(block, false);
+
+	if(!returns && (return_type != class_database.get_for_void() || (dual && !dual->empty()))) {
+		errors.emplace_back(block.end - 1, block.end, "Non-void function doesn't always return a value.");
+	}
+
+	if(errors.empty()) {
+		return std::nullopt;
+	}
+	return errors;
+}
+
+std::optional<std::vector<TypeError>> RealFunctionInfo::check_body(std::map<std::string, const TypeInfo*> variable_map, ClassDatabase& class_database) const {
+	std::vector<TypeError> errors;
+	std::set<std::string> call_arguments;
+	auto add_argument_do = [&](const Identifier& name, const TypeInfo* type){
+		if(variable_map.find(name.name) != variable_map.end()) {
+			errors.emplace_back(name, "Variable redefinition.");
+			return;
+		}
+		variable_map.insert(std::make_pair(name.name, type));
+		call_arguments.insert(name.name);
+	};
+
+	auto add_argument = overload(
+	add_argument_do,
+	[&](const Identifier& name, const auto& type){
+		call_with_error_log(errors, class_database.get(type), [&](auto t){
+			add_argument_do(name, t);
+		});
+	}
+	);
+
+	auto remove_arguments = [&](){
+		for(const std::string& name : call_arguments) {
+			variable_map.erase(name);
+		}
+		call_arguments.clear();
+	};
+
+	std::optional<std::vector<const TypeInfo*>> dual;
+
+	if(dual_ast) {
+		dual = std::vector<const TypeInfo*>{};
+		for(const auto&[type, name] : (**dual_ast).first) {
+			call_with_error_log(errors, class_database.get(type), [&](const TypeInfo* t){
+				dual->push_back(t);
+			});
+		}
+	}
+
+	if(!errors.empty()) {
+		return errors;
+	}
+
 	{
 		if(body_ast) {
-			variable_stack.emplace_back();
 			for(size_t i = 0; i < arguments.size(); ++i) {
-				add_variable((**body_ast).arguments[i].second, arguments[i]);
+				add_argument((**body_ast).arguments[i].second, arguments[i]);
 			}
-			bool returns = check_block(**(**body_ast).body, false);
-			if(!returns && (return_type != class_database.get_for_void() || (dual_ast && !(**dual_ast).first.empty()))) {
-				errors.emplace_back(declaration_ast->name, "Non-void function doesn't return a value in some cases.");
-			}
-			remove_last_variable_block();
+			call_with_error_log(errors, check_function_block(return_type, dual, variable_map, class_database, **(**body_ast).body));
+			remove_arguments();
 		}
 		if(dual_ast) {
-			variable_stack.emplace_back();
 			for(const auto& [type, name] : (**dual_ast).first) {
-				add_variable(name, type);
+				add_argument(name, type);
 			}
-			check_block(*(**dual_ast).second, false);
-			remove_last_variable_block();
+			call_with_error_log(errors, check_function_block(class_database.get_for_void(), std::nullopt, variable_map, class_database, *(**dual_ast).second));
+			remove_arguments();
 		}
 	}
 
