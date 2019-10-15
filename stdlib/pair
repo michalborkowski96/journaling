@@ -1,8 +1,0 @@
-struct Pair T U {
-	strong T first;
-	strong U second;
-	constructor(T f, U s) {
-		first = f;
-		second = s;
-	};
-}

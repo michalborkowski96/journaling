@@ -1,0 +1,35 @@
+struct ListElement_ T {
+	strong T element_;
+	strong ListElement_ next_;
+	weak ListElement_ prev_;
+
+	constructor (T e, ListElement_ n, ListElement_ p) {
+		element_ = e;
+		next_ = n;
+		prev_ = p;
+	};
+
+	fun T deref(){
+		return element_;
+	};
+
+	fun void set(T e){
+		element_ = e;
+	};
+
+	fun ListElement_ next() {
+		return next_;
+	};
+
+	fun ListElement_ prev() {
+		return prev_;
+	};
+
+	fun int eq(ListElement_ that) {
+		return this == that;
+	};
+
+	fun int neq(ListElement_ that) {
+		return this != that;
+	};
+}

@@ -163,6 +163,8 @@ namespace ast {
 
 		struct VariableDeclaration;
 
+		struct VariableAuto;
+
 		struct Assignment;
 
 		struct Return;
@@ -179,7 +181,7 @@ namespace ast {
 
 		struct StatementExpression;
 
-		using Statement = Wrap<std::variant, std::unique_ptr, Break, Continue, Block, Empty, For, VariableDeclaration, Return, If, While, Assignment, StatementExpression>;
+		using Statement = Wrap<std::variant, std::unique_ptr, Break, VariableAuto, Continue, Block, Empty, For, VariableDeclaration, Return, If, While, Assignment, StatementExpression>;
 
 		struct Block : AstNode  {
 			std::vector<Statement> statements;
@@ -195,6 +197,12 @@ namespace ast {
 			Identifier name;
 			std::optional<expression::Expression> value;
 			VariableDeclaration(size_t begin, size_t end, VariableType&& type, Identifier&& name, std::optional<expression::Expression>&& value);
+		};
+
+		struct VariableAuto : public AstNode {
+			Identifier name;
+			expression::Expression value;
+			VariableAuto(size_t begin, size_t end, Identifier&& name, expression::Expression value);
 		};
 
 		struct Assignment : public AstNode {

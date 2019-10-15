@@ -1,0 +1,14 @@
+import "iostream.🍆"
+import "string.🍆"
+
+struct Error {
+	int something;
+	constructor(String message) {
+		var StdErr s = new StdErr();
+		s.print_string(message);
+		s.flush();
+		s = null;
+		var Error e;
+		e.something = 69; /* SEGFAULT */
+	};
+}

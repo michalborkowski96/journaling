@@ -2,8 +2,7 @@ nojournal String {
 	fun int get(int i) {return null;};
 	fun void set(int i) {};
 	fun int size() {return null;};
-	fun void resize(int size) {};
-	fun void resize(int size, int char) {};
+	fun void resize(int new_size, int char) {};
 	fun void clear() {};
 	fun int empty() {return null;};
 	fun void append(String s){};
@@ -19,5 +18,4 @@ nojournal String {
 	fun int me(String s) {return null;};
 
 	constructor() {};
-	constructor(int i) {};
 }

@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "system.h"
 
 #include <filesystem>
 #include <fstream>
@@ -6,12 +7,12 @@
 #include <map>
 #include <set>
 
-#include "system.h"
-
 using namespace lexer;
 using namespace ast;
 using namespace expression;
 using namespace statement;
+
+constexpr const char* const FILENAME_EXTENSION = ".🍆";
 
 namespace {
 	class TokensView {
@@ -310,6 +311,7 @@ namespace {
 				Statement before = parse_statement();
 				if(!std::holds_alternative<std::unique_ptr<VariableDeclaration>>(before)
 						&& !std::holds_alternative<std::unique_ptr<Empty>>(before)
+						&& !std::holds_alternative<std::unique_ptr<VariableAuto>>(before)
 						&& !std::holds_alternative<std::unique_ptr<Assignment>>(before)
 						&& !std::holds_alternative<std::unique_ptr<StatementExpression>>(before)) {
 					throw error();
@@ -339,6 +341,16 @@ namespace {
 					value = parse_expression();
 				}
 				s = std::make_unique<VariableDeclaration>(begin, tokens[pos - 1].end, std::move(type), std::move(name), std::move(value));
+				break;
+			}
+			case LexemeType::AUTO:
+			{
+				++pos;
+				Identifier name = parse_identifier();
+				check_for_tokens(LexemeType::ASSIGNMENT);
+				++pos;
+				Expression value = parse_expression();
+				s = std::make_unique<VariableAuto>(begin, tokens[pos - 1].end, std::move(name), std::move(value));
 				break;
 			}
 			case LexemeType::RETURN:
@@ -726,62 +738,6 @@ namespace {
 		i.read(bytes.data(), file_size);
 		return bytes;
 	}
-
-	void print_lines(const std::string& program, size_t begin, size_t end, std::ostream& out) {
-		int pre = 1;
-		int post = 2;
-
-		size_t b = begin;
-		while(b && pre != -1) {
-			--b;
-			if(program[b] == '\n') {
-				--pre;
-			}
-		}
-		if(b && b != begin) {
-			++b;
-		}
-
-		size_t e = end;
-		while(e < program.size() && post != -1) {
-			++e;
-			if(program[e] == '\n') {
-				--post;
-			}
-		}
-
-		for(size_t i = b; i < end; ++i) {
-			if(i == begin) {
-			out << "\033[1;31m";
-			}
-			out << program[i];
-		}
-		out << "\033[m";
-		for(size_t i = end; i < e; ++i) {
-			out << program[i];
-		}
-	}
-
-	std::pair<size_t, size_t> position(const std::string& program, size_t pos) {
-		size_t line = 1;
-		size_t line_pos = 0;
-		for(size_t i = 0; i <= pos && i < program.size(); ++i) {
-			if(program[i] == '\n') {
-				line_pos = i;
-				++line;
-			}
-		}
-		return std::make_pair(line, pos - line_pos);
-	}
-
-	std::string position(const std::string& program, size_t begin, size_t end) {
-		std::pair<size_t, size_t> b = position(program, begin);
-		std::pair<size_t, size_t> e = position(program, end);
-		auto s = [](const std::pair<size_t, size_t> f) {
-			return "line " + std::to_string(f.first) + " column " + std::to_string(f.second);
-		};
-		return "from " + s(b) + " to " + s(e);
-	}
 }
 
 ParserError::ParserError(std::vector<std::string> parsing_stack, std::optional<std::string> message, std::optional<std::tuple<size_t, size_t, std::string>> text) : parsing_stack(move(parsing_stack)), message(move(message)), text(move(text)) {}
@@ -817,6 +773,10 @@ std::vector<ParsedModule> parse_program(std::string path) {
 			path = std::filesystem::canonical(path);
 		} catch (const std::filesystem::filesystem_error&) {
 			throw make_error("Cannot convert relative path to canonical path");
+		}
+		std::string ext(FILENAME_EXTENSION);
+		if(path.size() < ext.size() || path.substr(path.size() - ext.size()) != ext) {
+			throw make_error("Filenames must end with " + ext);
 		}
 		if(already_parsed.find(path) != already_parsed.end()) {
 			parsing_stack.pop_back();
@@ -869,13 +829,13 @@ std::ostream& operator<<(std::ostream& o, const ParserError& e) {
 		o << "In module " << m << ":\n";
 	}
 	if(e.message) {
-		o << "Error: " << *(e.message) << ".\n";
+		o << "Error: " << *(e.message) << "\n";
 	} else {
 		o << "Error.\n";
 	}
 	if(e.text) {
 		o << position(std::get<2>(*(e.text)), std::get<0>(*(e.text)), std::get<1>(*(e.text))) <<'\n';
-		print_lines(std::get<2>(*(e.text)), std::get<0>(*(e.text)), std::get<1>(*(e.text)), o);
+		print_lines(std::get<2>(*(e.text)), std::get<0>(*(e.text)), std::get<1>(*(e.text)), o, RED);
 		o << '\n';
 	}
 	return o;

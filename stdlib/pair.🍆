@@ -1,0 +1,39 @@
+struct Pair T U {
+	strong T first;
+	strong U second;
+	constructor(T f, U s) {
+		first = f;
+		second = s;
+	};
+	optional {
+		fun int less(Pair o) {
+			if(first < o.first) {
+				return 1;
+			}
+			if(o.first < first) {
+				return 0;
+			}
+			if(second < o.second) {
+				return 1;
+			}
+			return 0;
+		};
+	}
+	optional {
+		fun int eq(Pair o) {
+			return first == o.first && second == o.second;
+		};
+		fun int neq(Pair o) {
+			return !eq(o);
+		};
+	}
+	optional {
+		fun void print(OutputStream o) {
+			o.print_string("{");
+			first.print(o);
+			o.print_string(", ");
+			second.print(o);
+			o.print_string("}");
+		};
+	}
+}

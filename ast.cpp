@@ -46,6 +46,8 @@ Empty::Empty(size_t begin, size_t end) : AstNode(begin, end) {}
 
 VariableDeclaration::VariableDeclaration(size_t begin, size_t end, VariableType&& type, Identifier&& name, std::optional<Expression>&& value) : AstNode(begin, end), type(std::move(type)), name(std::move(name)), value(std::move(value)) {}
 
+VariableAuto::VariableAuto(size_t begin, size_t end, Identifier&& name, expression::Expression value) : AstNode(begin, end), name(std::move(name)), value(std::move(value)) {}
+
 Assignment::Assignment(size_t begin, size_t end, Expression variable, Expression value) : AstNode(begin, end), variable(std::move(variable)), value(std::move(value)) {}
 
 Return::Return(size_t begin, size_t end, std::vector<Expression>&& values) : AstNode(begin, end), values(std::move(values)) {}

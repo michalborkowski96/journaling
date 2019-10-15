@@ -1,0 +1,76 @@
+import "container.🍆"
+import "avl_.🍆"
+import "pair.🍆"
+import "set.🍆"
+
+nojournal MapComparator_ K V : Comparator<Pair<K, V>> {
+	strong Comparator<K> c;
+	constructor (Comparator<K> comp)(){
+		c = comp;
+	};
+	fun int less(Pair<K, V> e1, Pair<K, V> e2) {
+		return c.less(e1.first, e2.first);
+	};
+}
+
+Map K V : Container<Pair<K, V>, AVLNode_<Pair<K, V>>> {
+	strong Set<Pair<K, V>> data;
+	constructor(Comparator<K> c) () {
+		data = new Set<Pair<K, V>>(new MapComparator_<K, V>(c));
+	};
+	fun V at(K key) {
+		auto iter = find(key);
+		return iter.deref().second;
+	} noeffect;
+	fun int size() {
+		return data.size();
+	} noeffect;
+	fun AVLNode_<Pair<K, V>> begin() {
+		return data.begin();
+	} noeffect;
+	fun AVLNode_<Pair<K, V>> end() {
+		return data.end();
+	} noeffect;
+	fun void clear() {
+		data.clear();
+	} irreversible;
+	fun AVLNode_<Pair<K, V>> find(K key) {
+		return data.find(new Pair<K, V>(key, null));
+	} noeffect;
+
+	fun Pair<int, Pair<K, V>> insert_kv(K key, V value) {
+		return this.insert(new Pair<K, V>(key, value));
+	} dual (){};
+
+	fun Pair<int, Pair<K, V>> insert(Pair<K, V> entry) {
+		var Pair<int, Pair<K, V>> old = data.insert(entry);
+		if(old.first) {
+			return old, old.second, true;
+		} else {
+			return old, new Pair<K, V>(entry.first, null), false;
+		}
+	} dual (Pair<K, V> old, int had_old) {
+		if(had_old) {
+			insert(old);
+		} else {
+			erase(old.first);
+		}
+	};
+
+	fun Pair<int, V> erase(K key) {
+		var Pair<int, Pair<K, V>> old = data.erase(new Pair<K, V>(key, null));
+		var V v;
+		if(old.second != null) {
+			v = old.second.second;
+		}
+		if(old.first) {
+			return new Pair<int, V>(old.first, v), old.second, true;
+		} else {
+			return new Pair<int, V>(old.first, v), null, false;
+		}
+	} dual (Pair<K, V> old, int had_old) {
+		if(had_old) {
+			insert(old);
+		}
+	};
+}

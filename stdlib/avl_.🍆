@@ -1,12 +1,10 @@
-import "iterator"
-
-struct AVLNode_ T: Iterator<T> {
+struct AVLNode_ T {
 	int height;
 	strong T data;
-	weak AVLNode_<T> parent;
-	strong AVLNode_<T> left_son;
-	strong AVLNode_<T> right_son;
-	constructor (T d, AVLNode_<T> p) {
+	weak AVLNode_ parent;
+	strong AVLNode_ left_son;
+	strong AVLNode_ right_son;
+	constructor (T d, AVLNode_ p) {
 		data = d;
 		parent = p;
 	};
@@ -19,13 +17,21 @@ struct AVLNode_ T: Iterator<T> {
 		data = e;
 	};
 
+	fun int eq(AVLNode_ o) {
+		return this == o;
+	};
+
+	fun int neq(AVLNode_ o) {
+		return this != o;
+	};
+
 	fun int recalc_height() {
 		var int hl = -1;
-		if(left_son) {
+		if(left_son != null) {
 			hl = left_son.height;
 		}
 		var int hr = -1;
-		if(right_son) {
+		if(right_son != null) {
 			hr = right_son.height;
 		}
 		if(hr > hl) {
@@ -36,47 +42,49 @@ struct AVLNode_ T: Iterator<T> {
 		return hr - hl;
 	};
 
-	fun AVLNode_<T> next() {
-		if(right_son) {
-			var AVLNode_<T> b = right_son;
-			while(b.left_son) {
+	fun AVLNode_ next() {
+		if(right_son != null) {
+			var AVLNode_ b = right_son;
+			while(b.left_son != null) {
 				b = b.left_son;
 			}
 			return b;
 		}
-		var AVLNode_<T> b = parent;
-		var AVLNode_<T> d = this;
-		while(true) {
-			if(b.left_son && b.left_son == d) {
+		var AVLNode_ b = parent;
+		var AVLNode_ d = this;
+		while(1) {
+			if(b.left_son != null && b.left_son == d) {
 				return b;
 			}
 			d = b;
 			b = b.parent;
 		}
+		return null;
 	};
 
-	fun AVLNode_<T> prev() {
-		if(left_son) {
-			var AVLNode_<T> b = left_son;
-			while(b.right_son) {
+	fun AVLNode_ prev() {
+		if(left_son != null) {
+			var AVLNode_ b = left_son;
+			while(b.right_son != null) {
 				b = b.right_son;
 			}
 			return b;
 		}
-		var AVLNode_<T> b = parent;
-		var AVLNode_<T> d = this;
-		while(true) {
-			if(b.right_son && b.right_son == d) {
+		var AVLNode_ b = parent;
+		var AVLNode_ d = this;
+		while(1) {
+			if(b.right_son != null && b.right_son == d) {
 				return b;
 			}
-			d = b.data;
+			d = b;
 			b = b.parent;
 		}
+		return null;
 	};
 
 	fun void right_rotate() {
-		var AVLNode_<T> t = this;
-		var AVLNode_<T> ls = left_son;
+		var AVLNode_ t = this;
+		var AVLNode_ ls = left_son;
 		ls.parent = parent;
 		left_son = ls.right_son;
 		ls.right_son = this;
@@ -91,8 +99,8 @@ struct AVLNode_ T: Iterator<T> {
 	};
 
 	fun void left_rotate() {
-		var AVLNode_<T> t = this;
-		var AVLNode_<T> rs = right_son;
+		var AVLNode_ t = this;
+		var AVLNode_ rs = right_son;
 		rs.parent = parent;
 		right_son = rs.left_son;
 		rs.left_son = this;
@@ -106,7 +114,7 @@ struct AVLNode_ T: Iterator<T> {
 		}
 	};
 
-	fun bool equals(Iterator<T> that) {
+	fun int equals(AVLNode_ that) {
 		return this == that;
 	};
 }

@@ -1,0 +1,144 @@
+import "comparator.🍆"
+import "iostream.🍆"
+
+abstract Container Element Iterator {
+	constructor(){};
+	fun int empty() {
+		return size() == 0;
+	} noeffect;
+
+	fun int size() noeffect;
+
+	fun Iterator begin() noeffect;
+
+	fun Iterator end() noeffect;
+
+	optional {
+
+	fun int eq(Container other) {
+		if(size() != other.size()) {
+			return 0;
+		}
+		var Iterator it1 = begin();
+		var Iterator it2 = other.begin();
+		while(!it1.eq(end())) {
+			if(!it1.deref().eq(it2.deref())) {
+				return 0;
+			}
+			it1 = it1.next();
+			it2 = it2.next();
+		}
+		return 1;
+	} noeffect;
+
+	fun int neq(Container other) {
+		return !eq(other);
+	} noeffect;
+
+	}
+
+	optional {
+
+	fun int less(Container other) {
+		if(size() < other.size()) {
+			return 1;
+		}
+		if(size() > other.size()) {
+			return 0;
+		}
+		var Iterator it1 = begin();
+		var Iterator it2 = other.begin();
+		while(!it1.eq(end())) {
+			if(it1.deref().less(it2.deref())) {
+				return 1;
+			}
+			if(it2.deref().less(it1.deref())) {
+				return 0;
+			}
+			it1 = it1.next();
+			it2 = it2.next();
+		}
+		return 0;
+	} noeffect;
+
+	fun int more(Container other) {
+		return other.less(this);
+	} noeffect;
+
+	fun int less_eq(Container other) {
+		return !more(other);
+	} noeffect;
+
+	fun int more_eq(Container other) {
+		return !less(other);
+	} noeffect;
+
+	}
+
+	optional{
+
+	fun void print(OutputStream o) {
+		var Iterator i = begin();
+		o.print_string("{");
+		if(!i.eq(end())) {
+			i.deref().print(o);
+			i = i.next();
+		}
+		while(!i.eq(end())) {
+			o.print_string(", ");
+			i.deref().print(o);
+			i = i.next();
+		}
+		o.print_string("}");
+	} noeffect;
+
+	}
+}
+
+abstract OrderedContainer Element Iterator : Container<Element, Iterator> {
+	constructor()(){};
+	fun Iterator insert(Iterator iter, Element element) dual (Iterator iter) {
+		erase(iter);
+	};
+
+	fun Iterator erase(Iterator iter) dual (Iterator iter, Element e) {
+		insert(iter, e);
+	};
+
+	fun void push_back(Element e) {
+		this.insert(end(), e);
+	} dual (){};
+
+	fun void pop_back() {
+		this.erase(end().prev());
+	} dual (){};
+
+	fun void push_front(Element e) {
+		this.insert(begin(), e);
+	} dual (){};
+
+	fun void pop_front() {
+		this.erase(begin());
+	} dual (){};
+
+	fun void resize(int new_size, Element el) {
+		while(size() < new_size) {
+			this.push_back(el);
+		}
+		while(size() > new_size) {
+			this.pop_back();
+		}
+	} dual(){};
+
+	fun void sort(Comparator<Element> comp) {
+		for(var Iterator e1 = begin(); !e1.eq(end()); e1 = e1.next()) {
+			for(var Iterator e2 = e1.next(); !e2.eq(end()); e2 = e2.next()) {
+				if(comp.less(e2.deref(), e1.deref())) {
+					var Element e = e1.deref();
+					e1.set(e2.deref());
+					e2.set(e);
+				}
+			}
+		}
+	} irreversible;
+}

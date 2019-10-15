@@ -1,28 +1,28 @@
 abstract nojournal Comparator T {
 	constructor (){};
-	fun bool less(T e1, T e2);
+	fun int less(T e1, T e2);
 
-	fun bool more(T e1, T e2) {
+	fun int more(T e1, T e2) {
 		return less(e2, e1);
 	};
-	fun bool eq(T e1, T e2) {
+	fun int eq(T e1, T e2) {
 		return !less(e1, e2) && !more(e1, e2);
 	};
-	fun bool neq(T e1, T e2) {
+	fun int neq(T e1, T e2) {
 		return less(e1, e2) || more(e1, e2);
 	};
-	fun bool le(T e1, T e2) {
+	fun int le(T e1, T e2) {
 		return less(e1, e2) || !more(e1, e2);
 	};
-	fun bool me(T e1, T e2) {
+	fun int me(T e1, T e2) {
 		return more(e1, e2) || !less(e1, e2);
 	};
 
 }
 
 nojournal DefaultComparator T : Comparator<T> {
-	constructor (){};
-	fun bool less(T e1, T e2) {
+	constructor ()(){};
+	fun int less(T e1, T e2) {
 		return e1 < e2;
 	};
 }
