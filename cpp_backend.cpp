@@ -17,7 +17,7 @@ std::ostream& operator<<(std::ostream& o, const PointerType& t) {
 		o << "<";
 		o << t.parameters[0];
 		for(size_t i = 1; i < t.parameters.size(); ++i) {
-			o << ", ", t.parameters[i];
+			o << ", " << t.parameters[i];
 		}
 		o << '>';
 	}
@@ -27,7 +27,7 @@ std::ostream& operator<<(std::ostream& o, const PointerType& t) {
 std::ostream& operator<<(std::ostream& o, const VariableType& t) {
 	return std::visit(overload(
 	[&](const IntType&)->std::ostream&{
-	o << INT_TYPE_NAME;
+	o << "aubergine::Integer";
 	return o;
 	},
 	[&](const PointerType& pt)->std::ostream&{
@@ -40,7 +40,7 @@ std::ostream& operator<<(std::ostream& o, const VariableType& t) {
 std::ostream& operator<<(std::ostream& o, const Type& t) {
 	return std::visit(overload(
 	[&](const VoidType&)->std::ostream&{
-	o << VOID_TYPE_NAME;
+	o << "void";
 	return o;
 	},
 	[&](const VariableType& vt)->std::ostream&{
@@ -109,6 +109,8 @@ void print(const ParsedModule& m) {
 		}
 		return true;
 	};
+	header.print_line("#include <aubergine>");
+	header.print_line();
 
 	for(const std::string& import : m.module.imports) {
 		std::string import_header = import;
@@ -133,11 +135,24 @@ void print(const ParsedModule& m) {
 			header.print_endline();
 		}
 		header.print_indentation();
-		header.print_data("class ", c.name.name);
+		header.print_data(c.public_variables ? "class " : "struct ", c.name.name);
 		if(c.superclass) {
 			header.print_data(" : public ", *c.superclass);
 		}
 		header.print_data(" {");
+		header.print_endline();
+		header.add_level();
+		for(const ClassVariable& var : c.variables) {
+			std::visit(overload(
+			[&](const ClassVariableInteger& i) {
+				header.print_line("aubergine::Object<aubergine::Integer> ", i.name.name, ';');
+			},
+			[&](const ClassVariablePointer& p) {
+				header.print_line("aubergine::Object<", p.type, "> ", p.name.name, ';');
+			}
+			), var);
+		}
+		header.remove_level();
 		header.print_endline();
 		header.print_data("}");
 		header.print_endline();
