@@ -18,3 +18,7 @@ int go_to_file_path(std::string absolute_path) {
 	}
 	return chdir(absolute_path.data());
 }
+
+std::string get_file_name_from_absolute_path(const std::string& absolute_path) {
+	return absolute_path.substr(absolute_path.rfind('/') + 1);
+}

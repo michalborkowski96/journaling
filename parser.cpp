@@ -12,8 +12,6 @@ using namespace ast;
 using namespace expression;
 using namespace statement;
 
-constexpr const char* const FILENAME_EXTENSION = ".🍆";
-
 namespace {
 	class TokensView {
 		const std::vector<Lexeme>& tokens;

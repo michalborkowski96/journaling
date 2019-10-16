@@ -7,6 +7,29 @@
 #include <string>
 #include <ostream>
 
+constexpr const char* const ADD_FUN_NAME = "add";
+constexpr const char* const SUB_FUN_NAME = "sub";
+constexpr const char* const MUL_FUN_NAME = "mul";
+constexpr const char* const DIV_FUN_NAME = "div";
+constexpr const char* const OR_FUN_NAME = "or";
+constexpr const char* const AND_FUN_NAME = "and";
+constexpr const char* const NEG_FUN_NAME = "neg";
+constexpr const char* const OPP_FUN_NAME = "opp";
+constexpr const char* const MOD_FUN_NAME = "mod";
+constexpr const char* const LESS_FUN_NAME = "less";
+constexpr const char* const LESS_EQUAL_FUN_NAME = "le";
+constexpr const char* const MORE_FUN_NAME = "more";
+constexpr const char* const MORE_EQUAL_FUN_NAME = "me";
+
+constexpr const char* const STRING_TYPE_NAME = "String";
+constexpr const char* const INT_TYPE_NAME = "int";
+constexpr const char* const NULL_TYPE_NAME = "null";
+constexpr const char* const VOID_TYPE_NAME = "void";
+
+constexpr const char* const THIS_NAME = "this";
+
+constexpr const char* const FILENAME_EXTENSION = ".🍆";
+
 using Integer = int64_t;
 
 template<template <typename...> typename T, template <typename, typename...> typename U, typename... Vs>
