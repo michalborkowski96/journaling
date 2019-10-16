@@ -36,18 +36,6 @@ namespace ast {
 
 	using Type = std::variant<VoidType, VariableType>;
 
-	template<typename A, typename B, typename C>
-
-	auto visit_type (const Type& t, A a, B b, C c){
-		return std::visit(overload(
-		[&](const VoidType& t){return a(t);},
-		[&](const VariableType& t){return std::visit(overload(
-			[&](const IntType& t){return b(t);},
-			[&](const PointerType& t){return c(t);}
-		), t);}
-		), t);
-	}
-
 	struct IntType : public AstNode {
 		IntType(size_t begin, size_t end);
 	};

@@ -815,6 +815,9 @@ public:
 		for(const Constructor& c : ast->constructors) {
 			check_constructor_body(c, type_info->constructors.at(c.arguments.size()));
 		}
+		if(ast->destructor) {
+			call_with_error_log(errors, check_function_block(class_database.get_for_void(), std::nullopt, base_variables, class_database, *ast->destructor->body));
+		}
 		std::vector<TypeError> optional_errors;
 		for(const std::vector<Function>& funs : ast->optional_functions) {
 			size_t errors_size = optional_errors.size();
