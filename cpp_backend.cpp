@@ -141,5 +141,6 @@ void print(const ParsedModule& m) {
 		header.print_endline();
 		header.print_data("}");
 		header.print_endline();
+		header.print_line();
 	}
 }
