@@ -765,7 +765,7 @@ std::vector<ParsedModule> parse_program(std::string path) {
 		return ParserError(move(err_parsing_stack), move(msg), std::make_tuple(begin, end, move(text)));
 	};
 
-	program_parser = [&](std::string& path) {
+	program_parser = [&](std::string path) {
 		parsing_stack.push_back(&path);
 		try {
 			path = std::filesystem::canonical(path);
