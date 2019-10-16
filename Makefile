@@ -5,10 +5,11 @@ CC=g++-9
 
 all: aubergine
 
-aubergine: ast.o cpp_backend.o lexer.o main.o parser.o system_posix.o system.h typechecker.o util.o
+%.o: %.cpp *.h
+	${CC} $< ${FLAGS} -c
 
-%.o: %.c %.h
-	CC %.c FLAGS -c
+aubergine: ast.o cpp_backend.o lexer.o main.o parser.o system_posix.o system.h typechecker.o util.o
+	${CC} *.o -o aubergine
 
 clean:
 	rm *.o

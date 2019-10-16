@@ -4,6 +4,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "typechecker.h"
+#include "cpp_backend.h"
 
 int print_help(){
 	std::cout<<"Program expected one argument, which is the file name.\n";
@@ -23,5 +24,8 @@ int main(int argc, char* argv[]){
 		out << e;
 	}
 	typechecker_errors = typecheck(parsed_program);
+	for(const ParsedModule& m : parsed_program) {
+		print(m);
+	}
 	TypeError::print_errors(std::cout, parsed_program, typechecker_errors);
 }
