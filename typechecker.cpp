@@ -614,6 +614,9 @@ public:
 	}
 	static std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, std::vector<TypeError>> make_class(ClassDatabase& class_database, const Class* ast) {
 		std::vector<TypeError> errors;
+		if(ast->parameters.empty() && !ast->optional_functions.empty()) {
+			errors.emplace_back(ast->name, "Class without parameters must not have optional functions.");
+		}
 		std::unique_ptr<RealClassInfo> type_info;
 		{
 			std::optional<const TypeInfo*> superclass;

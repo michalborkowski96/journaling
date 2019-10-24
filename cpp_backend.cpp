@@ -14,10 +14,9 @@ std::ostream& operator<<(std::ostream& o, const VariableType& t);
 std::ostream& operator<<(std::ostream& o, const PointerType& t) {
 	o << u8"type_" << t.name.name;
 	if(!t.parameters.empty()) {
-		o << "<";
-		o << t.parameters[0];
-		for(size_t i = 1; i < t.parameters.size(); ++i) {
-			o << ", " << t.parameters[i];
+		o << "<void";
+		for(const auto& p : t.parameters) {
+			o << ", " << p;
 		}
 		o << '>';
 	}
