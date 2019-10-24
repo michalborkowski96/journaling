@@ -127,7 +127,7 @@ void print(const ParsedModule& m) {
 		if(!c.parameters.empty()) {
 			header.print_indentation();
 			header.print_data("template <");
-			header.print_data(u8"typename type_", c.parameters[0].name);
+			header.print_data(u8"typename typebase_", c.parameters[0].name);
 			for(size_t i = 1; i < c.parameters.size(); ++i) {
 				header.print_data(u8", typename type_", c.parameters[i].name);
 			}
@@ -135,7 +135,7 @@ void print(const ParsedModule& m) {
 			header.print_endline();
 		}
 		header.print_indentation();
-		header.print_data(c.public_variables ? "class " : "struct ", u8"type_", c.name.name);
+		header.print_data(c.public_variables ? "struct " : "class ", u8"type_", c.name.name);
 		if(c.superclass) {
 			header.print_data(" : public ", *c.superclass);
 		}
