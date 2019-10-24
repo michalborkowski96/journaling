@@ -532,7 +532,7 @@ void print(const ParsedModule& m) {
 					header.print_data("auto basefun_", f.name);
 					header.print_function_arguments(f.arguments);
 					header.print_data(' ');
-					header.print_block(*f.body);
+					header.print_block(**f.body);
 					header.print_endline();
 				}
 
@@ -580,7 +580,6 @@ void print(const ParsedModule& m) {
 				}
 				header.print_data(");");
 				header.print_endline();
-				header.print_
 				header.print_line(u8"return 🍆::get_return_value<", f.return_type, ">(result);");
 				header.print_line('}');
 

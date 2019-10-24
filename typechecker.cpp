@@ -621,6 +621,9 @@ public:
 		{
 			std::optional<const TypeInfo*> superclass;
 			if(ast->superclass) {
+				if(ast->public_variables) {
+					errors.emplace_back(ast->name, "Struct-like class must not extend another class.");
+				}
 				call_with_error_log(errors, class_database.get(*ast->superclass), [&](const TypeInfo* type){
 					if(!type->extendable()) {
 						errors.emplace_back(*(ast->superclass), "Cannot extend struct-like classes.");
