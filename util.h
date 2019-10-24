@@ -52,6 +52,8 @@ constexpr const char* const RED = "\033[1;31m";
 
 constexpr const char* const YELLOW = "\033[1;33m";
 
+constexpr const char* const GREEN = "\033[1;32m";
+
 constexpr const char* const ENDCOLOUR = "\033[m";
 
 #endif

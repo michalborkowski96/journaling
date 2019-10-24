@@ -12,7 +12,7 @@ using CppBackendError = std::runtime_error;
 std::ostream& operator<<(std::ostream& o, const VariableType& t);
 
 std::ostream& operator<<(std::ostream& o, const PointerType& t) {
-	o << t.name.name;
+	o << u8"type_" << t.name.name;
 	if(!t.parameters.empty()) {
 		o << "<";
 		o << t.parameters[0];
@@ -27,7 +27,7 @@ std::ostream& operator<<(std::ostream& o, const PointerType& t) {
 std::ostream& operator<<(std::ostream& o, const VariableType& t) {
 	return std::visit(overload(
 	[&](const IntType&)->std::ostream&{
-	o << "aubergine::Integer";
+	o << u8"🍆::Integer";
 	return o;
 	},
 	[&](const PointerType& pt)->std::ostream&{
@@ -109,7 +109,7 @@ void print(const ParsedModule& m) {
 		}
 		return true;
 	};
-	header.print_line("#include <aubergine>");
+	header.print_line(u8"#include <🍆>");
 	header.print_line();
 
 	for(const std::string& import : m.module.imports) {
@@ -127,15 +127,15 @@ void print(const ParsedModule& m) {
 		if(!c.parameters.empty()) {
 			header.print_indentation();
 			header.print_data("template <");
-			header.print_data("typename ", c.parameters[0].name);
+			header.print_data(u8"typename type_", c.parameters[0].name);
 			for(size_t i = 1; i < c.parameters.size(); ++i) {
-				header.print_data(", typename ", c.parameters[i].name);
+				header.print_data(u8", typename type_", c.parameters[i].name);
 			}
 			header.print_data('>');
 			header.print_endline();
 		}
 		header.print_indentation();
-		header.print_data(c.public_variables ? "class " : "struct ", c.name.name);
+		header.print_data(c.public_variables ? "class " : "struct ", u8"type_", c.name.name);
 		if(c.superclass) {
 			header.print_data(" : public ", *c.superclass);
 		}
@@ -145,10 +145,10 @@ void print(const ParsedModule& m) {
 		for(const ClassVariable& var : c.variables) {
 			std::visit(overload(
 			[&](const ClassVariableInteger& i) {
-				header.print_line("aubergine::Object<aubergine::Integer> ", i.name.name, ';');
+				header.print_line(u8"🍆::Integer ", i.name.name, ';');
 			},
 			[&](const ClassVariablePointer& p) {
-				header.print_line("aubergine::Object<", p.type, "> ", p.name.name, ';');
+				header.print_line(u8"🍆::", p.strong ? "Strong" : "Weak", "Object<" , p.type, "> ", p.name.name, ';');
 			}
 			), var);
 		}

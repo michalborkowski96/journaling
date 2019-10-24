@@ -116,7 +116,7 @@ namespace {
 
 		Expression parse_ll_expression() {
 			std::optional<Expression> expression;
-			size_t begin = tokens[pos - 1].begin;
+			size_t begin = tokens[pos].begin;
 			expect(
 			LexemeType::STRING_LITERAL, [&]() {
 				std::string str = parse_string();

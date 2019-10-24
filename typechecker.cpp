@@ -969,10 +969,17 @@ std::optional<ExpressionCheckResult> check_expression(std::vector<TypeError>& er
 	[&](const std::unique_ptr<StringLiteral>& e)->std::optional<ExpressionCheckResult>{
 		auto t = class_database.get_for_string();
 		if(t) {
-			return ExpressionCheckResult(*t, false);
+			auto construct_result = (**t).constructible_with({class_database.get_for_int()});
+			if(!construct_result) {
+				errors.emplace_back(*e, "String class must have int contructor to use string literals.");
+				return std::nullopt;
+			} else {
+				return ExpressionCheckResult(*t, false);
+			}
+		} else {
+			errors.emplace_back(*e, "String library required to use string literals.");
+			return std::nullopt;
 		}
-		errors.emplace_back(*e, "String library required to use string literals.");
-		return std::nullopt;
 	},
 	[&](const std::unique_ptr<IntegerLiteral>&)->std::optional<ExpressionCheckResult>{
 		return ExpressionCheckResult(class_database.get_for_int(), false);

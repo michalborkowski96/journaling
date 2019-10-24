@@ -22,10 +22,20 @@ int main(int argc, char* argv[]){
 		parsed_program = parse_program(argv[1]);
 	} catch(const ParserError& e) {
 		out << e;
+		out << RED << "FAILURE!\n" << ENDCOLOUR;
+		return 1;
 	}
 	typechecker_errors = typecheck(parsed_program);
-	for(const ParsedModule& m : parsed_program) {
-		print(m);
+	if(typechecker_errors.first.empty()) {
+		for(const ParsedModule& m : parsed_program) {
+			print(m);
+		}
 	}
 	TypeError::print_errors(std::cout, parsed_program, typechecker_errors);
+	if(typechecker_errors.first.empty()) {
+		out << GREEN << "OK!\n" << ENDCOLOUR;
+	} else {
+		out << RED << "FAILURE!\n" << ENDCOLOUR;
+		return 1;
+	}
 }

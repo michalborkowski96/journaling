@@ -3,14 +3,14 @@ CC=g++-9
 
 .PHONY: clean
 
-all: aubergine
+all: 🍆
 
 %.o: %.cpp *.h
 	${CC} $< ${FLAGS} -c
 
-aubergine: ast.o cpp_backend.o lexer.o main.o parser.o system_posix.o system.h typechecker.o util.o
-	${CC} *.o -o aubergine
+🍆: ast.o cpp_backend.o lexer.o main.o parser.o system_posix.o system.h typechecker3.o util.o
+	${CC} $^ -o 🍆
 
 clean:
 	rm *.o
-	rm aubergine
+	rm 🍆

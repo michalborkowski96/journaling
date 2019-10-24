@@ -4,10 +4,88 @@
 
 namespace lexer {
 
+	const std::map<std::string, std::string> allowed_unicode_chars = {
+	{u8"\u00A8", u8"\u00A8"},
+	{u8"\u00AA", u8"\u00AA"},
+	{u8"\u00AD", u8"\u00AD"},
+	{u8"\u00AF", u8"\u00AF"},
+	{u8"\u00B2", u8"\u00B5"},
+	{u8"\u00B7", u8"\u00BA"},
+	{u8"\u00BC", u8"\u00BE"},
+	{u8"\u00C0", u8"\u00D6"},
+	{u8"\u00D8", u8"\u00F6"},
+	{u8"\u00F8", u8"\u07FF"},
+	{u8"\u0800", u8"\u167F"},
+	{u8"\u1681", u8"\u180D"},
+	{u8"\u180F", u8"\u1FFF"},
+	{u8"\u200B", u8"\u200D"},
+	{u8"\u202A", u8"\u202E"},
+	{u8"\u203F", u8"\u2040"},
+	{u8"\u2054", u8"\u2054"},
+	{u8"\u2060", u8"\u218F"},
+	{u8"\u2460", u8"\u24FF"},
+	{u8"\u2776", u8"\u2793"},
+	{u8"\u2C00", u8"\u2DFF"},
+	{u8"\u2E80", u8"\u2FFF"},
+	{u8"\u3004", u8"\u3007"},
+	{u8"\u3021", u8"\u302F"},
+	{u8"\u3031", u8"\uD7FF"},
+	{u8"\uF900", u8"\uFD3D"},
+	{u8"\uFD40", u8"\uFDCF"},
+	{u8"\uFDF0", u8"\uFE44"},
+	{u8"\uFE47", u8"\uFFFD"},
+	{u8"\U00010000", u8"\U0001FFFD"},
+	{u8"\U00020000", u8"\U0002FFFD"},
+	{u8"\U00030000", u8"\U0003FFFD"},
+	{u8"\U00040000", u8"\U0004FFFD"},
+	{u8"\U00050000", u8"\U0005FFFD"},
+	{u8"\U00060000", u8"\U0006FFFD"},
+	{u8"\U00070000", u8"\U0007FFFD"},
+	{u8"\U00080000", u8"\U0008FFFD"},
+	{u8"\U00090000", u8"\U0009FFFD"},
+	{u8"\U000A0000", u8"\U000AFFFD"},
+	{u8"\U000B0000", u8"\U000BFFFD"},
+	{u8"\U000C0000", u8"\U000CFFFD"},
+	{u8"\U000D0000", u8"\U000DFFFD"},
+	{u8"\U000E0000", u8"\U000EFFFD"}
+	};
+
+	const std::map<std::string, std::string> not_beginning_unicode_chars = {
+	{u8"\u0300", u8"\u036F"},
+	{u8"\u1DC0", u8"\u1DFF"},
+	{u8"\u20D0", u8"\u20FF"},
+	{u8"\uFE20", u8"\uFE2F"}
+	};
+
+	bool in_unicode_ranges(const std::string& c, const std::map<std::string, std::string>& ranges) {
+		auto i = ranges.upper_bound(c);
+		if(i == ranges.begin()) {
+			return false;
+		}
+		--i;
+		return c >= i->first && c <= i->second;
+	}
+
 	LexerError::LexerError(size_t begin, size_t end, const char* msg) : begin(begin), end(end), msg(msg) {}
 
 	const char* LexerError::what() const noexcept {
 		return msg;
+	}
+
+	size_t get_unicode_char_len(const char* text) {
+		auto at = [&](size_t i){
+			return ((const uint8_t*) text)[i];
+		};
+		if((at(0) >> 5) == 6U && (at(1) >> 6) == 2U) {
+			return 2;
+		}
+		if((at(0) >> 4) == 14U && (at(1) >> 6) == 2U && (at(2) >> 6) == 2U) {
+			return 3;
+		}
+		if((at(0) >> 3) == 30U && (at(1) >> 6) == 2U && (at(2) >> 6) == 2U && (at(3) >> 6) == 2U) {
+			return 4;
+		}
+		return 0;
 	}
 
 	Lexeme::Lexeme(size_t begin, size_t end, LexemeType type) : begin(begin), end(end), type(type) {}
@@ -124,19 +202,30 @@ namespace lexer {
 			if(program[pos] == '_') {
 				throw LexerError(pos, pos + 1, "Identifier begins with an underscore.");
 			}
+			{
+				size_t c = get_unicode_char_len(program.data() + pos);
+				if(c) {
+					if(in_unicode_ranges(program.substr(pos, c), not_beginning_unicode_chars)) {
+						throw LexerError(pos, pos + c, "Identifier begins with an invalid character.");
+					}
+				}
+			}
 			size_t oldpos = pos;
 			bool last_underscore = false;
 			while(pos < program.size()) {
 				if(program[pos] >= 'a' && program[pos] <= 'z') {
 					++pos;
+					last_underscore = false;
 					continue;
 				}
 				if(program[pos] >= 'A' && program[pos] <= 'Z') {
 					++pos;
+					last_underscore = false;
 					continue;
 				}
 				if(program[pos] >= '0' && program[pos] <= '9') {
 					++pos;
+					last_underscore = false;
 					continue;
 				}
 				if(program[pos] == '_') {
@@ -146,6 +235,13 @@ namespace lexer {
 					last_underscore = true;
 					++pos;
 					continue;
+				}
+				size_t c = get_unicode_char_len(program.data() + pos);
+				if(c) {
+					if(in_unicode_ranges(program.substr(pos, c), allowed_unicode_chars)) {
+						last_underscore = false;
+						pos += c;
+					}
 				}
 				break;
 			}
