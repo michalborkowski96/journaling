@@ -898,6 +898,9 @@ std::variant<std::unique_ptr<RealFunctionInfo>, std::vector<TypeError>> RealFunc
 
 	std::optional<const Function*> body;
 	if(ast->body) {
+		if(overridden && (**overridden).body_ast) {
+			errors.emplace_back(ast->name, "Pure virtual function overrides a function with defined body.");
+		}
 		body = ast;
 	} else if(overridden && (**overridden).body_ast) {
 		body = (**overridden).body_ast;

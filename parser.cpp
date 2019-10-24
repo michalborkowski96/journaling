@@ -412,6 +412,9 @@ namespace {
 					break;
 				} else {
 					s = std::make_unique<StatementExpression>(begin, tokens[pos - 1].end, std::move(expr));
+					if(!std::holds_alternative<std::unique_ptr<FunctionCall>>(expr)) {
+						throw error();
+					}
 					break;
 				}
 			}
