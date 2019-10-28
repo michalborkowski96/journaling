@@ -3,10 +3,15 @@
 
 #include <vector>
 #include <optional>
+#include <functional>
+#include <map>
+#include <set>
 
 #include "ast.h"
 #include "parser.h"
 #include "util.h"
+
+namespace typechecker {
 
 struct TypeError {
 	size_t begin;
@@ -26,6 +31,161 @@ struct TypeError {
 	static void print_errors(std::ostream& o, const std::vector<ParsedModule>& modules, const std::pair<std::vector<TypeError>, std::vector<TypeError>>& errors);
 };
 
-std::pair<std::vector<TypeError>, std::vector<TypeError>> typecheck(const std::vector<ParsedModule>&);
+class RealClassInfo;
+class NullTypeInfo;
+class IntTypeInfo;
+class TemplateUnknownTypeInfo;
+class VoidTypeInfo;
+class FunctionalTypeInfo;
+class FunctionInfo;
+
+class TypeInfo {
+	friend class RealClassInfo;
+	friend class NullTypeInfo;
+	friend class IntTypeInfo;
+	friend class TemplateUnknownTypeInfo;
+	friend class VoidTypeInfo;
+	friend class FunctionalTypeInfo;
+	virtual bool implicitly_convertible_from(const RealClassInfo* o) const = 0;
+	virtual bool implicitly_convertible_from(const NullTypeInfo* o) const = 0;
+	virtual bool implicitly_convertible_from(const IntTypeInfo* o) const = 0;
+	virtual bool implicitly_convertible_from(const TemplateUnknownTypeInfo* o) const = 0;
+	virtual bool implicitly_convertible_from(const VoidTypeInfo*) const;
+	bool implicitly_convertible_from(const FunctionalTypeInfo*) const;
+	TypeInfo() = default;
+	TypeInfo(const TypeInfo&) = delete;
+	TypeInfo(TypeInfo&&) = delete;
+public:
+	virtual bool extendable() const;
+	virtual std::optional<const TypeInfo*> get_superclass() const;
+	virtual bool constructible_with(const std::vector<const TypeInfo*>&) const;
+	virtual std::optional<const TypeInfo*> call_with(const std::vector<const TypeInfo*>&) const;
+	virtual bool check_nojournal_mark(bool mark) const = 0;
+	virtual bool implicitly_convertible_to(const TypeInfo* o) const = 0;
+	virtual std::string full_name() const = 0;
+	virtual std::optional<const TypeInfo*> get_member(const std::string& name) const = 0;
+
+	virtual ~TypeInfo() = default;
+
+	bool explicitly_convertible_to(const TypeInfo* o) const;
+
+	bool comparable_with(const TypeInfo* o) const;
+};
+
+class FunctionInfo {
+protected:
+	FunctionInfo() = default;
+public:
+	FunctionInfo(const FunctionInfo&) = delete;
+	FunctionInfo(FunctionInfo&&) = delete;
+	virtual const TypeInfo* type_info() const = 0;
+	virtual std::optional<ast::FunctionKind> kind() const = 0;
+	virtual std::optional<const TypeInfo*> call_with(const std::vector<const TypeInfo*>& args) const = 0;
+	virtual std::string full_name() const = 0;
+	virtual ~FunctionInfo() = default;
+};
+
+class VariableMap {
+	std::map<std::string, const TypeInfo*> vars;
+	std::optional<const TypeInfo*> superclass;
+public:
+	VariableMap(std::optional<const TypeInfo*> superclass);
+	VariableMap() = delete;
+	void add(std::string name, const TypeInfo* type);
+	bool try_add(std::string name, const TypeInfo* type);
+	bool has(const std::string& name) const;
+	void erase(const std::string& name);
+	const TypeInfo* at(const std::string& name) const;
+};
+
+class ClassDatabase {
+	std::map<std::string, std::map<std::vector<const TypeInfo*>, std::shared_ptr<const TypeInfo>>> types; //pattern name -> params -> type_info
+	std::map<std::string, const TypeInfo*> current_class_parameters;
+	std::map<std::string, std::pair<const ast::Class*, std::shared_ptr<const std::string>>> patterns; //name -> ast, filename
+	std::optional<const TypeInfo*> get(const std::string& full_name) const;
+	std::vector<TypeError> optional_errors;
+	std::vector<std::shared_ptr<const RealClassInfo>> classes_order;
+public:
+	class NonOwnedParameter {
+		friend class ClassDatabase;
+		ClassDatabase* cd;
+		std::string name;
+		NonOwnedParameter(ClassDatabase* cd, std::string name, const TypeInfo* type);
+	public:
+		NonOwnedParameter() = delete;
+		NonOwnedParameter(const NonOwnedParameter&) = delete;
+		NonOwnedParameter(NonOwnedParameter&& o);
+		~NonOwnedParameter();
+	};
+	friend class NonOwnedParameter;
+	ClassDatabase();
+	std::vector<TypeError>& get_optional_errors();
+	ClassDatabase(const ClassDatabase&) = delete;
+	ClassDatabase(ClassDatabase&&) = default;
+	const TypeInfo* get_for_null() const;
+	std::optional<std::vector<TypeError>> insert_pattern(const ast::Class* p, std::shared_ptr<const std::string> filename);
+	const TypeInfo* get_for_int() const;
+	const TypeInfo* get_for_void() const;
+	std::optional<const TypeInfo*> get_for_string() const;
+	std::variant<const TypeInfo*, std::vector<TypeError>> get(const ast::Identifier& t);
+	std::variant<const TypeInfo*, std::vector<TypeError>> get(const ast::Type& t);
+	std::variant<const TypeInfo*, std::vector<TypeError>> get(const ast::VariableType& t);
+	std::variant<const TypeInfo*, std::vector<TypeError>> get(const ast::PointerType& t);
+	[[nodiscard]] NonOwnedParameter add_parameter(std::string name, const TypeInfo*);
+	std::vector<std::shared_ptr<const RealClassInfo>> get_move_ordered();
+};
+
+class RealFunctionInfo : public FunctionInfo {
+	const std::string name;
+	const TypeInfo* return_type;
+	const std::unique_ptr<const TypeInfo> type_info_data;
+	const std::vector<const TypeInfo*> arguments;
+	const ast::Function* declaration_ast;
+	const std::optional<const ast::Function*> body_ast;
+	const std::optional<std::pair<const std::pair<std::vector<std::pair<ast::VariableType, ast::Identifier>>, std::unique_ptr<ast::statement::Block>>*, std::vector<const TypeInfo*>>> dual;
+	RealFunctionInfo(std::string name, const TypeInfo* return_type, std::vector<const TypeInfo*> arguments, const ast::Function* declaration_ast, std::optional<const ast::Function*> body_ast, std::optional<std::pair<const std::pair<std::vector<std::pair<ast::VariableType, ast::Identifier>>, std::unique_ptr<ast::statement::Block>>*, std::vector<const TypeInfo*>>> dual);
+public:
+	RealFunctionInfo() = delete;
+	const TypeInfo* type_info() const override;
+	static std::variant<std::unique_ptr<RealFunctionInfo>, std::vector<TypeError>> make_function_declaration(std::optional<const RealFunctionInfo*> overridden, ClassDatabase& class_database, const ast::Function* ast);
+	virtual std::optional<ast::FunctionKind> kind() const override;
+	virtual std::optional<const TypeInfo*> call_with(const std::vector<const TypeInfo*>& args) const override;
+	bool fully_defined() const;
+	virtual std::string full_name() const override;
+	std::optional<std::vector<TypeError>> check_body(VariableMap& variable_map, ClassDatabase& class_database) const;
+	virtual ~RealFunctionInfo() = default;
+};
+
+class RealClassInfo : public TypeInfo {
+	std::vector<const TypeInfo*> parameters;
+	std::optional<const TypeInfo*> superclass;
+	std::map<std::string, const TypeInfo*> variables;
+	std::map<std::string, std::unique_ptr<RealFunctionInfo>> functions;
+	std::map<size_t, std::vector<const TypeInfo*>> constructors;
+	const ast::Class* ast_data;
+	RealClassInfo() = delete;
+	RealClassInfo(decltype(parameters) parameters, decltype(superclass) superclass, decltype(ast_data) ast_data);
+
+	virtual bool implicitly_convertible_from(const RealClassInfo* o) const override;
+	virtual bool implicitly_convertible_from(const NullTypeInfo*) const override;
+	virtual bool implicitly_convertible_from(const IntTypeInfo*) const override;
+	virtual bool implicitly_convertible_from(const TemplateUnknownTypeInfo*) const override;
+public:
+	virtual std::optional<const TypeInfo*> get_superclass() const override;
+	virtual ~RealClassInfo() = default;
+	virtual bool constructible_with(const std::vector<const TypeInfo*>& args) const override;
+	const std::string& pattern_name() const;
+	virtual std::optional<const TypeInfo*> get_member(const std::string& name) const override;
+	virtual bool check_nojournal_mark(bool mark) const override;
+	virtual bool extendable() const override;
+	static std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, std::vector<TypeError>> make_class(ClassDatabase& class_database, const ast::Class* ast);
+	std::optional<const RealFunctionInfo*> get_function(const std::string& name) const;
+	virtual bool implicitly_convertible_to(const TypeInfo* o) const override;
+	virtual std::string full_name() const override;
+};
+
+std::pair<std::pair<std::vector<TypeError>, std::vector<TypeError>>, std::vector<std::shared_ptr<const RealClassInfo>>> typecheck(const std::vector<ParsedModule>&);
+
+}
 
 #endif

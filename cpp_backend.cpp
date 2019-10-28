@@ -352,7 +352,8 @@ public:
 			print_data(")");
 			print_block(*s->body);
 			if(s->body_else) {
-				print_data(" else ");
+				print_indentation();
+				print_data("else ");
 				print_block(**s->body_else);
 			}
 		},

@@ -16,7 +16,7 @@ int main(int argc, char* argv[]){
 	if(argc != 2) {
 		return print_help();
 	}
-	std::pair<std::vector<TypeError>, std::vector<TypeError>> typechecker_errors;
+	std::pair<std::pair<std::vector<typechecker::TypeError>, std::vector<typechecker::TypeError>>, std::vector<std::shared_ptr<const typechecker::RealClassInfo>>> typechecker_result;
 	std::vector<ParsedModule> parsed_program;
 	try {
 		parsed_program = parse_program(argv[1]);
@@ -25,14 +25,14 @@ int main(int argc, char* argv[]){
 		out << RED << "FAILURE!\n" << ENDCOLOUR;
 		return 1;
 	}
-	typechecker_errors = typecheck(parsed_program);
-	if(typechecker_errors.first.empty()) {
+	typechecker_result = typechecker::typecheck(parsed_program);
+	if(typechecker_result.first.first.empty()) {
 		for(const ParsedModule& m : parsed_program) {
 			print(m);
 		}
 	}
-	TypeError::print_errors(std::cout, parsed_program, typechecker_errors);
-	if(typechecker_errors.first.empty()) {
+	typechecker::TypeError::print_errors(std::cout, parsed_program, typechecker_result.first);
+	if(typechecker_result.first.first.empty()) {
 		out << GREEN << "OK!\n" << ENDCOLOUR;
 	} else {
 		out << RED << "FAILURE!\n" << ENDCOLOUR;

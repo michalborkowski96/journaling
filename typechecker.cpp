@@ -1,12 +1,10 @@
 #include "typechecker.h"
 
-#include <functional>
-#include <map>
-#include <set>
-
 using namespace ast;
 using namespace expression;
 using namespace statement;
+
+namespace typechecker {
 
 TypeError::TypeError(size_t begin, size_t end, std::string data) : begin(begin), end(end), data(move(data)) {}
 
@@ -63,7 +61,105 @@ void TypeError::print_errors(std::ostream& o, const std::vector<ParsedModule>& m
 	print_error_vec(errors.second, YELLOW);
 }
 
-namespace {
+bool TypeInfo::implicitly_convertible_from(const VoidTypeInfo*) const {
+	return false;
+}
+
+bool TypeInfo::implicitly_convertible_from(const FunctionalTypeInfo*) const {
+	return false;
+}
+
+bool TypeInfo::extendable() const {
+	return false;
+}
+std::optional<const TypeInfo*> TypeInfo::get_superclass() const {
+	return std::nullopt;
+}
+bool TypeInfo::constructible_with(const std::vector<const TypeInfo*>&) const {
+	return false;
+}
+std::optional<const TypeInfo*> TypeInfo::call_with(const std::vector<const TypeInfo*>&) const {
+	return std::nullopt;
+}
+
+bool TypeInfo::explicitly_convertible_to(const TypeInfo* o) const {
+	return implicitly_convertible_to(o) || o->implicitly_convertible_to(this);
+}
+
+bool TypeInfo::comparable_with(const TypeInfo* o) const {
+	return explicitly_convertible_to(o);
+}
+
+
+VariableMap::VariableMap(std::optional<const TypeInfo*> superclass) : superclass(superclass) {}
+void VariableMap::add(std::string name, const TypeInfo* type) {
+	if(vars.find(name) != vars.end()) {
+		throw std::runtime_error("Internal error.");
+	}
+	vars.emplace(move(name), type);
+}
+bool VariableMap::try_add(std::string name, const TypeInfo* type) {
+	if(vars.find(name) != vars.end()) {
+		return false;
+	}
+	vars.emplace(move(name), type);
+	return true;
+}
+void VariableMap::erase(const std::string& name) {
+	if(vars.find(name) == vars.end()) {
+		throw std::runtime_error("Internal error.");
+	}
+	vars.erase(name);
+}
+
+
+ClassDatabase::NonOwnedParameter::NonOwnedParameter(NonOwnedParameter&& o) : cd(o.cd), name(move(o.name)) {
+	o.cd = nullptr;
+}
+
+std::vector<TypeError>& ClassDatabase::get_optional_errors() {
+	return optional_errors;
+}
+const TypeInfo* ClassDatabase::get_for_null() const {
+	return types.at(NULL_TYPE_NAME).at({}).get();
+}
+const TypeInfo* ClassDatabase::get_for_int() const {
+	return types.at(INT_TYPE_NAME).at({}).get();
+}
+const TypeInfo* ClassDatabase::get_for_void() const {
+	return types.at(VOID_TYPE_NAME).at({}).get();
+}
+std::optional<const TypeInfo*> ClassDatabase::get_for_string() const {
+	return get(STRING_TYPE_NAME);
+}
+std::variant<const TypeInfo*, std::vector<TypeError>> ClassDatabase::get(const Identifier& t) {
+	auto r = get(t.name);
+	if(r) {
+		return *r;
+	}
+	return std::vector<TypeError>{TypeError(t, "Class instance not found.")};
+}
+std::variant<const TypeInfo*, std::vector<TypeError>> ClassDatabase::get(const Type& t) {
+	return std::visit(overload(
+	[&](const VoidType&)->std::variant<const TypeInfo*, std::vector<TypeError>>{return get_for_void();},
+	[&](const VariableType& tt) {return get(tt);}
+	), t);
+}
+
+const TypeInfo* RealFunctionInfo::type_info() const {
+	return type_info_data.get();
+}
+
+std::optional<FunctionKind> RealFunctionInfo::kind() const {
+	return declaration_ast->kind;
+}
+bool RealFunctionInfo::fully_defined() const {
+	if(kind() && (*kind()) == FunctionKind::DUAL) {
+		return body_ast && dual;
+	} else {
+		return (bool) body_ast;
+	}
+}
 
 template<typename T, typename U>
 void call_with_error_log(std::vector<TypeError>& errors, std::variant<T, std::vector<TypeError>>&& data, U action_success){
@@ -102,103 +198,6 @@ void call_with_error_log(std::vector<TypeError>& errors, std::optional<std::vect
 	}
 }
 
-class TypeInfo;
-class RealClassInfo;
-class NullTypeInfo;
-class IntTypeInfo;
-class TemplateUnknownTypeInfo;
-class VoidTypeInfo;
-class FunctionalTypeInfo;
-class FunctionInfo;
-
-class VariableMap {
-	std::map<std::string, const TypeInfo*> vars;
-	std::optional<const TypeInfo*> superclass;
-public:
-	VariableMap(std::optional<const TypeInfo*> superclass) : superclass(superclass) {}
-	VariableMap() = delete;
-	void add(std::string name, const TypeInfo* type) {
-		if(vars.find(name) != vars.end()) {
-			throw std::runtime_error("Internal error.");
-		}
-		vars.emplace(move(name), type);
-	}
-	bool try_add(std::string name, const TypeInfo* type) {
-		if(vars.find(name) != vars.end()) {
-			return false;
-		}
-		vars.emplace(move(name), type);
-		return true;
-	}
-	bool has(const std::string& name) const;
-	void erase(const std::string& name) {
-		if(vars.find(name) == vars.end()) {
-			throw std::runtime_error("Internal error.");
-		}
-		vars.erase(name);
-	}
-	const TypeInfo* at(const std::string& name) const;
-};
-
-class ClassDatabase {
-	std::map<std::string, std::map<std::vector<const TypeInfo*>, std::unique_ptr<const TypeInfo>>> types; //pattern name -> params -> type_info
-	std::map<std::string, const TypeInfo*> current_class_parameters;
-	std::map<std::string, std::pair<const Class*, std::shared_ptr<const std::string>>> patterns; //name -> ast, filename
-	std::optional<const TypeInfo*> get(const std::string& full_name) const;
-	std::vector<TypeError> optional_errors;
-
-public:
-	class NonOwnedParameter {
-		friend class ClassDatabase;
-		ClassDatabase* cd;
-		std::string name;
-		NonOwnedParameter(ClassDatabase* cd, std::string name, const TypeInfo* type);
-	public:
-		NonOwnedParameter() = delete;
-		NonOwnedParameter(const NonOwnedParameter&) = delete;
-		NonOwnedParameter(NonOwnedParameter&& o) : cd(o.cd), name(move(o.name)) {
-			o.cd = nullptr;
-		}
-		~NonOwnedParameter();
-	};
-	friend class NonOwnedParameter;
-	ClassDatabase();
-	std::vector<TypeError>& get_optional_errors() {
-		return optional_errors;
-	}
-	ClassDatabase(const ClassDatabase&) = delete;
-	ClassDatabase(ClassDatabase&&) = delete;
-	const TypeInfo* get_for_null() const {
-		return types.at(NULL_TYPE_NAME).at({}).get();
-	}
-	std::optional<std::vector<TypeError>> insert_pattern(const Class* p, std::shared_ptr<const std::string> filename);
-	const TypeInfo* get_for_int() const {
-		return types.at(INT_TYPE_NAME).at({}).get();
-	}
-	const TypeInfo* get_for_void() const {
-		return types.at(VOID_TYPE_NAME).at({}).get();
-	}
-	std::optional<const TypeInfo*> get_for_string() const {
-		return get(STRING_TYPE_NAME);
-	}
-	std::variant<const TypeInfo*, std::vector<TypeError>> get(const Identifier& t) {
-		auto r = get(t.name);
-		if(r) {
-			return *r;
-		}
-		return std::vector<TypeError>{TypeError(t, "Class instance not found.")};
-	}
-	std::variant<const TypeInfo*, std::vector<TypeError>> get(const Type& t) {
-		return std::visit(overload(
-		[&](const VoidType&)->std::variant<const TypeInfo*, std::vector<TypeError>>{return get_for_void();},
-		[&](const VariableType& tt) {return get(tt);}
-		), t);
-	}
-	std::variant<const TypeInfo*, std::vector<TypeError>> get(const VariableType& t);
-	std::variant<const TypeInfo*, std::vector<TypeError>> get(const PointerType& t);
-	[[nodiscard]] NonOwnedParameter add_parameter(std::string name, const TypeInfo*);
-};
-
 std::string types_to_string(const std::vector<const TypeInfo*>& v);
 
 class ExpressionCheckResult {
@@ -213,19 +212,6 @@ public:
 	bool is_lvalue() const {
 		return lvalue;
 	}
-};
-
-class FunctionInfo {
-protected:
-	FunctionInfo() = default;
-public:
-	FunctionInfo(const FunctionInfo&) = delete;
-	FunctionInfo(FunctionInfo&&) = delete;
-	virtual const TypeInfo* type_info() const = 0;
-	virtual std::optional<FunctionKind> kind() const = 0;
-	virtual std::optional<const TypeInfo*> call_with(const std::vector<const TypeInfo*>& args) const = 0;
-	virtual std::string full_name() const = 0;
-	virtual ~FunctionInfo() = default;
 };
 
 class BuiltinIntFunctionInfo : public FunctionInfo {
@@ -262,87 +248,6 @@ public:
 		return arg ? std::string("int ") + name + "(int)" : std::string("int ") + name + "()";
 	}
 	virtual ~BuiltinIntFunctionInfo() = default;
-};
-
-class RealFunctionInfo : public FunctionInfo {
-	const std::string name;
-	const TypeInfo* return_type;
-	const std::unique_ptr<const TypeInfo> type_info_data;
-	const std::vector<const TypeInfo*> arguments;
-	const Function* declaration_ast;
-	const std::optional<const Function*> body_ast;
-	const std::optional<std::pair<const std::pair<std::vector<std::pair<VariableType, Identifier>>, std::unique_ptr<statement::Block>>*, std::vector<const TypeInfo*>>> dual;
-	RealFunctionInfo(std::string name, const TypeInfo* return_type, std::vector<const TypeInfo*> arguments, const Function* declaration_ast, std::optional<const Function*> body_ast, std::optional<std::pair<const std::pair<std::vector<std::pair<VariableType, Identifier>>, std::unique_ptr<statement::Block>>*, std::vector<const TypeInfo*>>> dual);
-public:
-	RealFunctionInfo() = delete;
-	const TypeInfo* type_info() const override {
-		return type_info_data.get();
-	}
-
-	static std::variant<std::unique_ptr<RealFunctionInfo>, std::vector<TypeError>> make_function_declaration(std::optional<const RealFunctionInfo*> overridden, ClassDatabase& class_database, const Function* ast);
-	virtual std::optional<FunctionKind> kind() const override {
-		return declaration_ast->kind;
-	}
-	virtual std::optional<const TypeInfo*> call_with(const std::vector<const TypeInfo*>& args) const override;
-	bool fully_defined() const {
-		if(kind() && (*kind()) == FunctionKind::DUAL) {
-			return body_ast && dual;
-		} else {
-			return (bool) body_ast;
-		}
-	}
-	virtual std::string full_name() const override;
-	std::optional<std::vector<TypeError>> check_body(VariableMap& variable_map, ClassDatabase& class_database) const;
-	virtual ~RealFunctionInfo() = default;
-};
-
-class TypeInfo {
-	friend class RealClassInfo;
-	friend class NullTypeInfo;
-	friend class IntTypeInfo;
-	friend class TemplateUnknownTypeInfo;
-	friend class VoidTypeInfo;
-	friend class FunctionalTypeInfo;
-	virtual bool implicitly_convertible_from(const RealClassInfo* o) const = 0;
-	virtual bool implicitly_convertible_from(const NullTypeInfo* o) const = 0;
-	virtual bool implicitly_convertible_from(const IntTypeInfo* o) const = 0;
-	virtual bool implicitly_convertible_from(const TemplateUnknownTypeInfo* o) const = 0;
-	virtual bool implicitly_convertible_from(const VoidTypeInfo*) const {
-		return false;
-	}
-	bool implicitly_convertible_from(const FunctionalTypeInfo*) const {
-		return false;
-	}
-	TypeInfo() = default;
-	TypeInfo(const TypeInfo&) = delete;
-	TypeInfo(TypeInfo&&) = delete;
-public:
-	virtual bool extendable() const {
-		return false;
-	}
-	virtual std::optional<const TypeInfo*> get_superclass() const {
-		return std::nullopt;
-	}
-	virtual bool constructible_with(const std::vector<const TypeInfo*>&) const {
-		return false;
-	}
-	virtual std::optional<const TypeInfo*> call_with(const std::vector<const TypeInfo*>&) const {
-		return std::nullopt;
-	}
-	virtual bool check_nojournal_mark(bool mark) const = 0;
-	virtual bool implicitly_convertible_to(const TypeInfo* o) const = 0;
-	virtual std::string full_name() const = 0;
-	virtual std::optional<const TypeInfo*> get_member(const std::string& name) const = 0;
-
-	virtual ~TypeInfo() = default;
-
-	bool explicitly_convertible_to(const TypeInfo* o) const {
-		return implicitly_convertible_to(o) || o->implicitly_convertible_to(this);
-	}
-
-	bool comparable_with(const TypeInfo* o) const {
-		return explicitly_convertible_to(o);
-	}
 };
 
 class FunctionalTypeInfo : public TypeInfo {
@@ -537,342 +442,333 @@ public:
 std::optional<ExpressionCheckResult> check_expression(std::vector<TypeError>& errors, const VariableMap& variable_map, ClassDatabase& class_database, const Expression& e);
 std::optional<std::vector<TypeError>> check_function_block(const TypeInfo* return_type, const std::optional<std::vector<const TypeInfo*>>& dual, VariableMap& variable_map, ClassDatabase& class_database, const Block& block);
 
-class RealClassInfo : public TypeInfo {
-	std::vector<const TypeInfo*> parameters;
-	std::optional<const TypeInfo*> superclass;
-	std::map<std::string, const TypeInfo*> variables;
-	std::map<std::string, std::unique_ptr<RealFunctionInfo>> functions;
-	std::map<size_t, std::vector<const TypeInfo*>> constructors;
-	const Class* ast_data;
-	RealClassInfo() = delete;
-	RealClassInfo(decltype(parameters) parameters, decltype(superclass) superclass, decltype(ast_data) ast_data) : parameters(move(parameters)), superclass(move(superclass)), ast_data(ast_data) {}
+RealClassInfo::RealClassInfo(decltype(parameters) parameters, decltype(superclass) superclass, decltype(ast_data) ast_data) : parameters(move(parameters)), superclass(move(superclass)), ast_data(ast_data) {}
 
-	virtual bool implicitly_convertible_from(const RealClassInfo* o) const override {
-		if(this == o) {
+bool RealClassInfo::implicitly_convertible_from(const RealClassInfo* o) const {
+	if(this == o) {
+		return true;
+	}
+	const TypeInfo* superclass = o;
+	while(superclass->get_superclass()) {
+		superclass = *superclass->get_superclass();
+		if(superclass == this) {
 			return true;
 		}
-		const TypeInfo* superclass = o;
-		while(superclass->get_superclass()) {
-			superclass = *superclass->get_superclass();
-			if(superclass == this) {
-				return true;
-			}
-		}
+	}
+	return false;
+}
+bool RealClassInfo::implicitly_convertible_from(const NullTypeInfo*) const {
+	return true;
+}
+bool RealClassInfo::implicitly_convertible_from(const IntTypeInfo*) const {
+	return false;
+}
+bool RealClassInfo::implicitly_convertible_from(const TemplateUnknownTypeInfo*) const {
+	return true;
+}
+
+std::optional<const TypeInfo*> RealClassInfo::get_superclass() const {
+	return superclass;
+}
+
+bool RealClassInfo::constructible_with(const std::vector<const TypeInfo*>& args) const {
+	auto constructor = constructors.find(args.size());
+	if(constructor == constructors.end()) {
 		return false;
 	}
-	virtual bool implicitly_convertible_from(const NullTypeInfo*) const override {
-		return true;
-	}
-	virtual bool implicitly_convertible_from(const IntTypeInfo*) const override {
-		return false;
-	}
-	virtual bool implicitly_convertible_from(const TemplateUnknownTypeInfo*) const override {
-		return true;
-	}
-public:
-	virtual std::optional<const TypeInfo*> get_superclass() const override {
-		return superclass;
-	}
-	virtual ~RealClassInfo() = default;
-	virtual bool constructible_with(const std::vector<const TypeInfo*>& args) const override {
-		auto constructor = constructors.find(args.size());
-		if(constructor == constructors.end()) {
+	for(size_t i = 0; i < args.size(); ++i) {
+		if(!args[i]->implicitly_convertible_to(constructor->second[i])) {
 			return false;
 		}
-		for(size_t i = 0; i < args.size(); ++i) {
-			if(!args[i]->implicitly_convertible_to(constructor->second[i])) {
-				return false;
-			}
-		}
-		return true;
 	}
-	const std::string& pattern_name() const {
-		return ast_data->name.name;
-	}
-	virtual std::optional<const TypeInfo*> get_member(const std::string& name) const override {
-		if(ast_data->public_variables) {
-			auto v = variables.find(name);
-			if(v != variables.end()) {
-				return v->second;
-			}
+	return true;
+}
+const std::string& RealClassInfo::pattern_name() const {
+	return ast_data->name.name;
+}
+std::optional<const TypeInfo*> RealClassInfo::get_member(const std::string& name) const {
+	if(ast_data->public_variables) {
+		auto v = variables.find(name);
+		if(v != variables.end()) {
+			return v->second;
 		}
+	}
 
-		auto f = get_function(name);
-		if(f) {
-			return (**f).type_info();
-		}
-		if(superclass) {
-			return (**superclass).get_member(name);
-		}
-		return std::nullopt;
+	auto f = get_function(name);
+	if(f) {
+		return (**f).type_info();
 	}
-	virtual bool check_nojournal_mark(bool mark) const override {
-		return mark == ast_data->nojournal;
+	if(superclass) {
+		return (**superclass).get_member(name);
 	}
-	virtual bool extendable() const override {
-		return !ast_data->public_variables;
+	return std::nullopt;
+}
+bool RealClassInfo::check_nojournal_mark(bool mark) const {
+	return mark == ast_data->nojournal;
+}
+bool RealClassInfo::extendable() const {
+	return !ast_data->public_variables;
+}
+std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, std::vector<TypeError>> RealClassInfo::make_class(ClassDatabase& class_database, const Class* ast) {
+	std::vector<TypeError> errors;
+	if(ast->parameters.empty() && !ast->optional_functions.empty()) {
+		errors.emplace_back(ast->name, "Class without parameters must not have optional functions.");
 	}
-	static std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, std::vector<TypeError>> make_class(ClassDatabase& class_database, const Class* ast) {
-		std::vector<TypeError> errors;
-		if(ast->parameters.empty() && !ast->optional_functions.empty()) {
-			errors.emplace_back(ast->name, "Class without parameters must not have optional functions.");
-		}
-		std::unique_ptr<RealClassInfo> type_info;
-		{
-			std::optional<const TypeInfo*> superclass;
-			if(ast->superclass) {
-				if(ast->public_variables) {
-					errors.emplace_back(ast->name, "Struct-like class must not extend another class.");
-				}
-				call_with_error_log(errors, class_database.get(*ast->superclass), [&](const TypeInfo* type){
-					if(!type->extendable()) {
-						errors.emplace_back(*(ast->superclass), "Cannot extend struct-like classes.");
-					} else if(!type->check_nojournal_mark(ast->nojournal)) {
-						if(ast->nojournal) {
-							errors.emplace_back(*(ast->superclass), "Extending journalable class with nojournal one.");
-						} else {
-							errors.emplace_back(*(ast->superclass), "Extending nojournal class with journalable one.");
-						}
+	std::unique_ptr<RealClassInfo> type_info;
+	{
+		std::optional<const TypeInfo*> superclass;
+		if(ast->superclass) {
+			if(ast->public_variables) {
+				errors.emplace_back(ast->name, "Struct-like class must not extend another class.");
+			}
+			call_with_error_log(errors, class_database.get(*ast->superclass), [&](const TypeInfo* type){
+				if(!type->extendable()) {
+					errors.emplace_back(*(ast->superclass), "Cannot extend struct-like classes.");
+				} else if(!type->check_nojournal_mark(ast->nojournal)) {
+					if(ast->nojournal) {
+						errors.emplace_back(*(ast->superclass), "Extending journalable class with nojournal one.");
 					} else {
-						superclass = type;
+						errors.emplace_back(*(ast->superclass), "Extending nojournal class with journalable one.");
 					}
-				});
-			}
-
-			std::vector<const TypeInfo*> parameters;
-
-			for(const Identifier& t : ast->parameters) {
-				call_with_error_log(errors, class_database.get(t), [&](const TypeInfo* type) {
-					parameters.push_back(type);
-				});
-			}
-
-			if(!errors.empty()) {
-				return errors;
-			}
-
-			type_info = std::unique_ptr<RealClassInfo>(new RealClassInfo(move(parameters), superclass, ast));
-		}
-
-		auto temp = class_database.add_parameter(ast->name.name, type_info.get());
-
-		{
-			auto add_variable = [&](const ClassVariable& node, std::string name, const TypeInfo* type){
-				if(type_info->variables.find(name) != type_info->variables.end()) {
-					std::visit([&](const auto& n){errors.emplace_back(n, "Redeclaration of a class variable.");}, node);
 				} else {
-					type_info->variables.emplace(std::move(name), type);
+					superclass = type;
 				}
-			};
-
-			for(const ClassVariable& var : ast->variables) {
-				std::visit(overload(
-				[&](const ClassVariableInteger& v){add_variable(var, v.name.name, class_database.get_for_int());},
-				[&](const ClassVariablePointer& v){
-					call_with_error_log(errors, class_database.get(v.type), [&](const auto& t){
-						add_variable(var, v.name.name, t);
-					});
-				}
-				), var);
-			}
+			});
 		}
 
-		auto verify_function_declaration = [&](bool optional, const Function& f, const RealFunctionInfo& fi)->std::optional<std::vector<TypeError>>{
-			std::vector<TypeError> errors;
-			if(type_info->variables.find(f.name.name) != type_info->variables.end()) {
-				errors.emplace_back(f.name, "Function shadows variable.");
-			}
-			if(type_info->functions.find(f.name.name) != type_info->functions.end()) {
-				errors.emplace_back(f.name, "Function overloading not supported.");
-			}
-			if(!ast->abstract && !fi.fully_defined()) {
-				errors.emplace_back(f.name, "Function not fully defined in non-abstract class.");
-			}
-			if(ast->nojournal && fi.kind()) {
-				errors.emplace_back(f.name, "Nojournal class must not specify function kind.");
-			}
-			if(!ast->nojournal && !fi.kind()) {
-				errors.emplace_back(f.name, "Class with journal must specify function kind.");
-			}
-			if(optional && !fi.fully_defined()) {
-				errors.emplace_back(f.name, "Optional functions must be fully defined.");
-			}
-			if(errors.empty()) {
-				return std::nullopt;
-			}
+		std::vector<const TypeInfo*> parameters;
+
+		for(const Identifier& t : ast->parameters) {
+			call_with_error_log(errors, class_database.get(t), [&](const TypeInfo* type) {
+				parameters.push_back(type);
+			});
+		}
+
+		if(!errors.empty()) {
 			return errors;
+		}
+
+		type_info = std::unique_ptr<RealClassInfo>(new RealClassInfo(move(parameters), superclass, ast));
+	}
+
+	auto temp = class_database.add_parameter(ast->name.name, type_info.get());
+
+	{
+		auto add_variable = [&](const ClassVariable& node, std::string name, const TypeInfo* type){
+			if(type_info->variables.find(name) != type_info->variables.end()) {
+				std::visit([&](const auto& n){errors.emplace_back(n, "Redeclaration of a class variable.");}, node);
+			} else {
+				type_info->variables.emplace(std::move(name), type);
+			}
 		};
 
-		{
-			auto check_argument_declaration = [&](const auto& f) -> std::vector<const TypeInfo*> {
-				std::vector<const TypeInfo*> args;
-				for(const auto&[type, ident] : f.arguments) {
-					call_with_error_log(errors, class_database.get(type), [&](const auto& t){
-						args.push_back(t);
-					});
-				}
-				return args;
-			};
-
-			for(const Constructor& c : ast->constructors) {
-				std::vector<const TypeInfo*> args = check_argument_declaration(c);
-				if(args.size() == c.arguments.size()) {
-					if(type_info->constructors.find(args.size()) != type_info->constructors.end()) {
-						errors.emplace_back(c.begin, c.body->begin, "Constructor overload only possible with a different number of arguments.");
-					} else {
-						type_info->constructors.emplace(args.size(), move(args));
-					}
-				}
-			}
-
-			for(const Function& f : ast->functions) {
-				std::optional<const RealFunctionInfo*> overridden;
-				if(type_info->superclass && dynamic_cast<const RealClassInfo*>(*type_info->superclass)) {
-					overridden = dynamic_cast<const RealClassInfo*>(*type_info->superclass)->get_function(f.name.name);
-				}
-				call_with_error_log(errors, RealFunctionInfo::make_function_declaration(overridden, class_database, &f), [&](std::unique_ptr<RealFunctionInfo>&& fi){
-					call_with_error_log(errors, verify_function_declaration(false, f, *fi), [&](){type_info->functions.emplace(f.name.name, std::move(fi));});
+		for(const ClassVariable& var : ast->variables) {
+			std::visit(overload(
+			[&](const ClassVariableInteger& v){add_variable(var, v.name.name, class_database.get_for_int());},
+			[&](const ClassVariablePointer& v){
+				call_with_error_log(errors, class_database.get(v.type), [&](const auto& t){
+					add_variable(var, v.name.name, t);
 				});
 			}
-			if(!errors.empty()) {
-				return errors;
+			), var);
+		}
+	}
+
+	auto verify_function_declaration = [&](bool optional, const Function& f, const RealFunctionInfo& fi)->std::optional<std::vector<TypeError>>{
+		std::vector<TypeError> errors;
+		if(type_info->variables.find(f.name.name) != type_info->variables.end()) {
+			errors.emplace_back(f.name, "Function shadows variable.");
+		}
+		if(type_info->functions.find(f.name.name) != type_info->functions.end()) {
+			errors.emplace_back(f.name, "Function overloading not supported.");
+		}
+		if(!ast->abstract && !fi.fully_defined()) {
+			errors.emplace_back(f.name, "Function not fully defined in non-abstract class.");
+		}
+		if(ast->nojournal && fi.kind()) {
+			errors.emplace_back(f.name, "Nojournal class must not specify function kind.");
+		}
+		if(!ast->nojournal && !fi.kind()) {
+			errors.emplace_back(f.name, "Class with journal must specify function kind.");
+		}
+		if(optional && !fi.fully_defined()) {
+			errors.emplace_back(f.name, "Optional functions must be fully defined.");
+		}
+		if(errors.empty()) {
+			return std::nullopt;
+		}
+		return errors;
+	};
+
+	{
+		auto check_argument_declaration = [&](const auto& f) -> std::vector<const TypeInfo*> {
+			std::vector<const TypeInfo*> args;
+			for(const auto&[type, ident] : f.arguments) {
+				call_with_error_log(errors, class_database.get(type), [&](const auto& t){
+					args.push_back(t);
+				});
 			}
-		}
-
-		VariableMap base_variables(type_info->superclass);
-
-		{
-			const TypeInfo* bs = type_info.get();
-			base_variables.add(THIS_NAME, bs);
-		}
-
-		for(const auto&[name, t] : type_info->variables) {
-			base_variables.add(name, t);
-		}
-
-		for(const auto&[name, f] : type_info->functions) {
-			base_variables.add(name, f->type_info());
-		}
-
-		for(const auto&[name, f] : type_info->functions) {
-			call_with_error_log(errors, f->check_body(base_variables, class_database));
-		}
-
-		auto check_constructor_body = [&errors, &base_variables, &class_database, &superclass = type_info->superclass](const Constructor& ast, const std::vector<const TypeInfo*>& args){
-			VariableMap variable_map = base_variables;
-			VariableMap superclass_call_variable_map(std::nullopt);
-			auto add_variable = [&](const Identifier& name, const TypeInfo* type){
-				if(!variable_map.try_add(name.name, type)) {
-					errors.emplace_back(name, "Variable redefinition.");
-					return;
-				}
-				superclass_call_variable_map.add(name.name, type);
-			};
-			for(size_t i = 0; i < args.size(); ++i) {
-				add_variable(ast.arguments[i].second, args[i]);
-			}
-			if(superclass) {
-				const TypeInfo* s = *superclass;
-				if(!ast.superclass_call) {
-					errors.emplace_back(ast.begin, ast.body->begin, "Constructor of the derived class doesn't call superclass constructor.");
-				} else {
-					std::vector<const TypeInfo*> superclass_call_args;
-					for(const Expression& e : *ast.superclass_call) {
-						auto t = check_expression(errors, superclass_call_variable_map, class_database, e);
-						if(t) {
-							superclass_call_args.push_back(t->type_info());
-						}
-					}
-					if(s) {
-						if(superclass_call_args.size() == ast.superclass_call->size() && !s->constructible_with(superclass_call_args)){
-							errors.emplace_back(ast.begin, ast.body->begin, "Superclass cannot be constructed with arguments (" + types_to_string(args) + ").");
-						}
-					}
-				}
-			} else {
-				if(ast.superclass_call) {
-					errors.emplace_back(ast.begin, ast.body->begin, "Constructor calls superclass constructor, but this class has no base class.");
-				}
-			}
-			call_with_error_log(errors, check_function_block(class_database.get_for_void(), std::nullopt, variable_map, class_database, *ast.body));
+			return args;
 		};
 
 		for(const Constructor& c : ast->constructors) {
-			check_constructor_body(c, type_info->constructors.at(c.arguments.size()));
-		}
-		if(ast->destructor) {
-			call_with_error_log(errors, check_function_block(class_database.get_for_void(), std::nullopt, base_variables, class_database, *ast->destructor->body));
-		}
-		std::vector<TypeError> optional_errors;
-		for(const std::vector<Function>& funs : ast->optional_functions) {
-			size_t errors_size = optional_errors.size();
-			std::map<std::string, std::unique_ptr<RealFunctionInfo>> optional_functions;
-			for(const Function& f : funs) {
-				std::optional<const RealFunctionInfo*> overridden;
-				if(type_info->superclass && dynamic_cast<const RealClassInfo*>(*type_info->superclass)) {
-					overridden = dynamic_cast<const RealClassInfo*>(*type_info->superclass)->get_function(f.name.name);
-				}
-				call_with_error_log(optional_errors, RealFunctionInfo::make_function_declaration(overridden, class_database, &f), [&](std::unique_ptr<RealFunctionInfo>&& fi){
-					call_with_error_log(optional_errors, verify_function_declaration(true, f, *fi), [&](){
-						if(optional_functions.find(f.name.name) != optional_functions.end()) {
-							optional_errors.emplace_back(f.name, "Optional function shadows another optional function in same group.");
-						} else {
-							optional_functions.emplace(f.name.name, std::move(fi));
-						}
-					});
-				});
-			}
-			if(optional_errors.size() != errors_size) {
-				continue;
-			}
-			for(auto& [name, ptr] : optional_functions) {
-				type_info->functions.emplace(name, std::move(ptr));
-			}
-			for(const auto& [fname, null_ptr] : optional_functions) {
-				const auto&[name, f] = *type_info->functions.find(fname);
-				base_variables.add(name, f->type_info());
-			}
-			for(const auto& [fname, null_ptr] : optional_functions) {
-				const auto&[name, f] = *type_info->functions.find(fname);
-				call_with_error_log(optional_errors, f->check_body(base_variables, class_database));
-			}
-			if(optional_errors.size() != errors_size) {
-				for(const auto& [fname, null_ptr] : optional_functions) {
-					const auto&[name, f] = *type_info->functions.find(fname);
-					base_variables.erase(name);
-					type_info->functions.erase(name);
+			std::vector<const TypeInfo*> args = check_argument_declaration(c);
+			if(args.size() == c.arguments.size()) {
+				if(type_info->constructors.find(args.size()) != type_info->constructors.end()) {
+					errors.emplace_back(c.begin, c.body->begin, "Constructor overload only possible with a different number of arguments.");
+				} else {
+					type_info->constructors.emplace(args.size(), move(args));
 				}
 			}
+		}
+
+		for(const Function& f : ast->functions) {
+			std::optional<const RealFunctionInfo*> overridden;
+			if(type_info->superclass && dynamic_cast<const RealClassInfo*>(*type_info->superclass)) {
+				overridden = dynamic_cast<const RealClassInfo*>(*type_info->superclass)->get_function(f.name.name);
+			}
+			call_with_error_log(errors, RealFunctionInfo::make_function_declaration(overridden, class_database, &f), [&](std::unique_ptr<RealFunctionInfo>&& fi){
+				call_with_error_log(errors, verify_function_declaration(false, f, *fi), [&](){type_info->functions.emplace(f.name.name, std::move(fi));});
+			});
 		}
 		if(!errors.empty()) {
 			return errors;
 		}
-		return std::make_pair(move(type_info), move(optional_errors));
 	}
-	std::optional<const RealFunctionInfo*> get_function(const std::string& name) const {
-		auto f = functions.find(name);
-		if(f == functions.end()) {
-			return std::nullopt;
-		}
-		return f->second.get();
+
+	VariableMap base_variables(type_info->superclass);
+
+	{
+		const TypeInfo* bs = type_info.get();
+		base_variables.add(THIS_NAME, bs);
 	}
-	virtual bool implicitly_convertible_to(const TypeInfo* o) const override {
-		return o->implicitly_convertible_from(this);
+
+	for(const auto&[name, t] : type_info->variables) {
+		base_variables.add(name, t);
 	}
-	virtual std::string full_name() const override {
-		std::string ret = ast_data->name.name;
-		if(!parameters.empty()) {
-			ret += "<";
-			ret += parameters[0]->full_name();
-			for(size_t i = 1; i < parameters.size(); ++i) {
-				ret += ", ";
-				ret += parameters[i]->full_name();;
+
+	for(const auto&[name, f] : type_info->functions) {
+		base_variables.add(name, f->type_info());
+	}
+
+	for(const auto&[name, f] : type_info->functions) {
+		call_with_error_log(errors, f->check_body(base_variables, class_database));
+	}
+
+	auto check_constructor_body = [&errors, &base_variables, &class_database, &superclass = type_info->superclass](const Constructor& ast, const std::vector<const TypeInfo*>& args){
+		VariableMap variable_map = base_variables;
+		VariableMap superclass_call_variable_map(std::nullopt);
+		auto add_variable = [&](const Identifier& name, const TypeInfo* type){
+			if(!variable_map.try_add(name.name, type)) {
+				errors.emplace_back(name, "Variable redefinition.");
+				return;
 			}
-			ret += ">";
+			superclass_call_variable_map.add(name.name, type);
+		};
+		for(size_t i = 0; i < args.size(); ++i) {
+			add_variable(ast.arguments[i].second, args[i]);
 		}
-		return ret;
+		if(superclass) {
+			const TypeInfo* s = *superclass;
+			if(!ast.superclass_call) {
+				errors.emplace_back(ast.begin, ast.body->begin, "Constructor of the derived class doesn't call superclass constructor.");
+			} else {
+				std::vector<const TypeInfo*> superclass_call_args;
+				for(const Expression& e : *ast.superclass_call) {
+					auto t = check_expression(errors, superclass_call_variable_map, class_database, e);
+					if(t) {
+						superclass_call_args.push_back(t->type_info());
+					}
+				}
+				if(s) {
+					if(superclass_call_args.size() == ast.superclass_call->size() && !s->constructible_with(superclass_call_args)){
+						errors.emplace_back(ast.begin, ast.body->begin, "Superclass cannot be constructed with arguments (" + types_to_string(args) + ").");
+					}
+				}
+			}
+		} else {
+			if(ast.superclass_call) {
+				errors.emplace_back(ast.begin, ast.body->begin, "Constructor calls superclass constructor, but this class has no base class.");
+			}
+		}
+		call_with_error_log(errors, check_function_block(class_database.get_for_void(), std::nullopt, variable_map, class_database, *ast.body));
+	};
+
+	for(const Constructor& c : ast->constructors) {
+		check_constructor_body(c, type_info->constructors.at(c.arguments.size()));
 	}
-};
+	if(ast->destructor) {
+		call_with_error_log(errors, check_function_block(class_database.get_for_void(), std::nullopt, base_variables, class_database, *ast->destructor->body));
+	}
+	std::vector<TypeError> optional_errors;
+	for(const std::vector<Function>& funs : ast->optional_functions) {
+		size_t errors_size = optional_errors.size();
+		std::map<std::string, std::unique_ptr<RealFunctionInfo>> optional_functions;
+		for(const Function& f : funs) {
+			std::optional<const RealFunctionInfo*> overridden;
+			if(type_info->superclass && dynamic_cast<const RealClassInfo*>(*type_info->superclass)) {
+				overridden = dynamic_cast<const RealClassInfo*>(*type_info->superclass)->get_function(f.name.name);
+			}
+			call_with_error_log(optional_errors, RealFunctionInfo::make_function_declaration(overridden, class_database, &f), [&](std::unique_ptr<RealFunctionInfo>&& fi){
+				call_with_error_log(optional_errors, verify_function_declaration(true, f, *fi), [&](){
+					if(optional_functions.find(f.name.name) != optional_functions.end()) {
+						optional_errors.emplace_back(f.name, "Optional function shadows another optional function in same group.");
+					} else {
+						optional_functions.emplace(f.name.name, std::move(fi));
+					}
+				});
+			});
+		}
+		if(optional_errors.size() != errors_size) {
+			continue;
+		}
+		for(auto& [name, ptr] : optional_functions) {
+			type_info->functions.emplace(name, std::move(ptr));
+		}
+		for(const auto& [fname, null_ptr] : optional_functions) {
+			const auto&[name, f] = *type_info->functions.find(fname);
+			base_variables.add(name, f->type_info());
+		}
+		for(const auto& [fname, null_ptr] : optional_functions) {
+			const auto&[name, f] = *type_info->functions.find(fname);
+			call_with_error_log(optional_errors, f->check_body(base_variables, class_database));
+		}
+		if(optional_errors.size() != errors_size) {
+			for(const auto& [fname, null_ptr] : optional_functions) {
+				const auto&[name, f] = *type_info->functions.find(fname);
+				base_variables.erase(name);
+				type_info->functions.erase(name);
+			}
+		}
+	}
+	if(!errors.empty()) {
+		return errors;
+	}
+	return std::make_pair(move(type_info), move(optional_errors));
+}
+std::optional<const RealFunctionInfo*> RealClassInfo::get_function(const std::string& name) const {
+	auto f = functions.find(name);
+	if(f == functions.end()) {
+		return std::nullopt;
+	}
+	return f->second.get();
+}
+bool RealClassInfo::implicitly_convertible_to(const TypeInfo* o) const {
+	return o->implicitly_convertible_from(this);
+}
+std::string RealClassInfo::full_name() const {
+	std::string ret = ast_data->name.name;
+	if(!parameters.empty()) {
+		ret += "<";
+		ret += parameters[0]->full_name();
+		for(size_t i = 1; i < parameters.size(); ++i) {
+			ret += ", ";
+			ret += parameters[i]->full_name();;
+		}
+		ret += ">";
+	}
+	return ret;
+}
 
 std::string types_to_string(const std::vector<const TypeInfo*>& v) {
 	std::string arg_types;
@@ -1517,7 +1413,8 @@ std::optional<std::vector<TypeError>> ClassDatabase::insert_pattern(const Class*
 			if(types.find(p->name.name) != types.end()) {
 				throw std::runtime_error("Internal error.");
 			}
-			types[p->name.name][{}] = std::move(r.first);
+			classes_order.emplace_back(std::move(r.first));
+			types[p->name.name][{}] = classes_order.back();
 		}
 		return std::nullopt;
 	},
@@ -1615,7 +1512,8 @@ std::variant<const TypeInfo*, std::vector<TypeError>> ClassDatabase::get(const P
 				optional_errors.push_back(std::move(oe));
 			}
 			RealClassInfo* ci = r.first.get();
-			types[t.name.name][params] = std::move(r.first);
+			classes_order.push_back(std::move(r.first));
+			types[t.name.name][params] = classes_order.back();
 			return ci;
 		},
 		[&](std::vector<TypeError> e)->std::variant<const TypeInfo*, std::vector<TypeError>>{
@@ -1645,9 +1543,12 @@ bool VariableMap::has(const std::string& name) const {
 	}
 	return false;
 }
+
+std::vector<std::shared_ptr<const RealClassInfo>> ClassDatabase::get_move_ordered() {
+	return move(classes_order);
 }
 
-std::pair<std::vector<TypeError>, std::vector<TypeError>> typecheck(const std::vector<ParsedModule>& modules) {
+std::pair<std::pair<std::vector<TypeError>, std::vector<TypeError>>, std::vector<std::shared_ptr<const RealClassInfo>>> typecheck(const std::vector<ParsedModule>& modules) {
 	std::vector<TypeError> errors;
 	ClassDatabase class_database;
 	for(const ParsedModule& m : modules) {
@@ -1656,7 +1557,7 @@ std::pair<std::vector<TypeError>, std::vector<TypeError>> typecheck(const std::v
 			call_with_error_log(errors, class_database.insert_pattern(&c, path));
 		}
 	}
-	return std::make_pair(std::move(errors), class_database.get_optional_errors());
+	return std::make_pair(std::make_pair(std::move(errors), class_database.get_optional_errors()), class_database.get_move_ordered());
 }
 
-
+}
