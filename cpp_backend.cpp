@@ -8,9 +8,6 @@ using namespace expression;
 using namespace statement;
 using namespace typechecker;
 
-#warning CppBackendError
-using CppBackendError = std::runtime_error;
-
 namespace {
 
 std::ostream& operator<<(std::ostream& o, const Identifier& i) {
@@ -101,17 +98,26 @@ public:
 		), t);
 	}
 
+	void print_owned_type(const VariableType& type, const std::map<std::string, const TypeInfo*>& parameters) {
+		std::visit(overload([&](const IntType&){
+			print_data(u8"🍆::Integer");
+		},
+		[&](const PointerType& type){
+			print_data(u8"🍆::StrongObject<");
+			print_type(type, parameters);
+			print_data('>');
+		}), type);
+	}
+
 	void print_function_arguments(const std::vector<std::pair<VariableType, Identifier>>& args, const std::map<std::string, const TypeInfo*>& parameters) {
 		print_data("(");
 		if(!args.empty()) {
-			print_data(u8"🍆::StrongObject<");
-			print_type(args[0].first, parameters);
-			print_data("> var_", args[0].second);
+			print_owned_type(args[0].first, parameters);
+			print_data(" var_", args[0].second);
 			for(size_t i = 1; i < args.size(); ++i) {
 				print_data(", ");
-				print_data(u8"🍆::StrongObject<");
-				print_type(args[i].first, parameters);
-				print_data("> var_", args[i].second);
+				print_owned_type(args[i].first, parameters);
+				print_data(" var_", args[i].second);
 			}
 		}
 		print_data(")");
@@ -351,9 +357,8 @@ public:
 			print_block(*s->body, parameters);
 		},
 		[&](const std::unique_ptr<VariableDeclaration>& s) {
-			print_data(u8"🍆::StrongObject<");
-			print_type(s->type, parameters);
-			print_data("> var_", s->name);
+			print_owned_type(s->type, parameters);
+			print_data(" var_", s->name);
 			if(s->value) {
 				print_data(" = ");
 				print_expression(*s->value, parameters);
@@ -484,7 +489,6 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 		output.print_data(" {");
 		output.print_endline();
 		output.add_level();
-		output.print_line(u8"🍆::WeakObject<Type_" , ast_data.name, "> _this;");
 		for(const ClassVariable& var : ast_data.variables) {
 			std::visit(overload(
 			[&](const ClassVariableInteger& i) {
@@ -504,51 +508,55 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 			output.print_line("public:");
 			output.add_level();
 		}
-/*
+
+		output.print_line(u8"🍆::WeakObject<Type_" , ast_data.name, "> _this;");
+
 		{
-			if(c.destructor) {
-				header.print_indentation();
-				header.print_data("~", c.name, "() ");
-				header.print_block(*c.destructor->body);
-				header.print_line();
+			if(ast_data.destructor) {
+				output.print_indentation();
+				output.print_data("~Type_", ast_data.name, "() ");
+				output.print_block(*ast_data.destructor->body, parameters);
+				output.print_line();
 			}
 		}
 
 		{
 			bool has_default_constructor = false;
-			for(const Constructor& constructor : c.constructors) {
+			for(const Constructor& constructor : ast_data.constructors) {
 				if(constructor.arguments.empty()) {
 					has_default_constructor = true;
 				}
-				header.print_indentation();
-				header.print_data("Base_", c.name);
-				header.print_function_arguments(constructor.arguments);
+				output.print_indentation();
+				output.print_data("Type_", ast_data.name);
+				output.print_function_arguments(constructor.arguments, parameters);
 
-				header.print_data(' ');
+				output.print_data(' ');
 				if(constructor.superclass_call) {
-					header.print_data(": ", *c.superclass, "(");
+					output.print_data(": ");
+					output.print_type(*ast_data.superclass, parameters);
+					output.print_data("(");
 					if(!constructor.superclass_call->empty()) {
-						header.print_expression((*constructor.superclass_call)[0]);
+						output.print_expression((*constructor.superclass_call)[0], parameters);
 						for(size_t i = 1; i < constructor.superclass_call->size(); ++i) {
-							header.print_data(", ");
-							header.print_expression((*constructor.superclass_call)[i]);
+							output.print_data(", ");
+							output.print_expression((*constructor.superclass_call)[i], parameters);
 						}
 					}
-					header.print_data(") ");
+					output.print_data(") ");
 				}
-				header.print_block(*constructor.body);
-				header.print_line();
+				output.print_block(*constructor.body, parameters);
+				output.print_line();
 			}
 			if(!has_default_constructor) {
-				header.print_line(c.name, "() = delete;");
-				header.print_line();
+				output.print_line("Type_", ast_data.name, "() = delete;");
+				output.print_line();
 			}
-			header.print_line(c.name, "(const ", c.name,"&) = delete;");
-			header.print_line();
-			header.print_line(c.name, "(", c.name,"&&) = delete;");
-			header.print_line();
+			output.print_line("Type_", ast_data.name, "(const Type_", ast_data.name,"&) = delete;");
+			output.print_line();
+			output.print_line("Type_", ast_data.name, "(Type_", ast_data.name,"&&) = delete;");
+			output.print_line();
 		}
-
+/*
 		{
 			for(const Function& f : c.functions) {
 				if(f.dual) {
@@ -573,7 +581,7 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 				std::visit(overload([&](const VoidType&){
 					header.print_data("void");
 				}, [&](const VariableType& t) {
-					header.print_data(u8"🍆::StrongObject<", t, '>');
+					header.print_owned_type(t, parameters);
 				}), f.return_type);
 				header.print_data(" privfun_", f.name);
 				header.print_function_arguments(f.arguments);
@@ -596,7 +604,7 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 				std::visit(overload([&](const VoidType&){
 					header.print_data("void");
 				}, [&](const VariableType& t) {
-					header.print_data(u8"🍆::StrongObject<", t, '>');
+					header.print_owned_type(t, parameters);
 				}), f.return_type);
 				header.print_data(" fun_", f.name);
 				header.print_function_arguments(f.arguments);
@@ -627,26 +635,15 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 		}
 		output.print_line();
 
-/*
-		auto print_template_args = [&](OutputFile& o){
-			if(ast_data.parameters.empty()) {
-				return;
-			}
-			o.print_data("<Type_", ast_data.parameters[0]);
-			for(size_t i = 1; i < ast_data.parameters.size(); ++i) {
-				o.print_data(", Type_", ast_data.parameters[i]);
-			}
-			o.print_data(">");
-		};
-
 		{
+			output.print_line("template <>");
 			output.print_indentation();
-			output.print_data("struct 🍆::has_journal<Type_", ast_data.name);
-			print_template_args(output);
-			output.print_data("> : public 🍆::", ast_data.nojournal ? "false" : "true", "_type {}");
+			output.print_data("struct 🍆::has_journal<");
+			output.print_type(c_);
+			output.print_data("> : public 🍆::", ast_data.nojournal ? "false" : "true", "_type {};");
 			output.print_endline();
 			output.print_line();
-		}*/
+		}
 	}
 }
 }
