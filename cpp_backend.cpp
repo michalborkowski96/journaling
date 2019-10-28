@@ -1,66 +1,28 @@
-#include "cpp_backend.h"
+#include "typechecker.h"
 #include "system.h"
 
-#include <fstream>
+#include <ostream>
 
 using namespace ast;
 using namespace expression;
 using namespace statement;
+using namespace typechecker;
 
 #warning CppBackendError
 using CppBackendError = std::runtime_error;
 
-std::ostream& operator<<(std::ostream& o, const VariableType& t);
-
-std::ostream& operator<<(std::ostream& o, const PointerType& t) {
-	o << u8"Type_" << t.name.name;
-	o << "<void";
-	for(const auto& p : t.parameters) {
-		o << ", " << p;
-	}
-	o << '>';
-	return o;
-}
-
-std::ostream& operator<<(std::ostream& o, const VariableType& t) {
-	return std::visit(overload(
-	[&](const IntType&)->std::ostream&{
-	o << u8"🍆::Integer";
-	return o;
-	},
-	[&](const PointerType& pt)->std::ostream&{
-	o << pt;
-	return o;
-	}
-	), t);
-}
-
-std::ostream& operator<<(std::ostream& o, const Type& t) {
-	return std::visit(overload(
-	[&](const VoidType&)->std::ostream&{
-	o << "void";
-	return o;
-	},
-	[&](const VariableType& vt)->std::ostream&{
-	o << vt;
-	return o;
-	}
-	), t);
-}
+namespace {
 
 std::ostream& operator<<(std::ostream& o, const Identifier& i) {
 	return o << i.name;
 }
 
 class OutputFile {
-	std::ofstream o;
+	std::ostream& o;
 	size_t level;
 	OutputFile() = delete;
 public:
-	OutputFile(const std::string& filename) : level(0) {
-		o.exceptions(std::ofstream::failbit | std::ofstream::badbit);
-		o.open(filename);
-	}
+	OutputFile(std::ostream& o) : o(o), level(0) {}
 	void add_level() {
 		++level;
 	}
@@ -72,13 +34,84 @@ public:
 			o << '\t';
 		}
 	}
-	void print_function_arguments(const std::vector<std::pair<VariableType, Identifier>>& args) {
+
+	void print_type(const TypeInfo* type) {
+		const RealClassInfo* as_real_class = dynamic_cast<const RealClassInfo*>(type);
+		if(as_real_class) {
+			RealClassInfoView view(*as_real_class);
+			print_data("Type_", view.ast_data->name);
+			if(!view.parameters.empty()) {
+				print_data('<');
+				print_type(view.parameters[0]);
+				for(size_t i = 0; i < view.parameters.size(); ++i) {
+					print_data(", ");
+					print_type(view.parameters[i]);
+				}
+				print_data('>');
+			}
+			return;
+		}
+		if(dynamic_cast<const IntTypeInfo*>(type)) {
+			print_data(u8"🍆::Integer");
+			return;
+		}
+		if(dynamic_cast<const VoidTypeInfo*>(type)) {
+			print_data("void");
+			return;
+		}
+		throw std::runtime_error("Internal error.");
+	}
+
+	void print_type(const PointerType& t, const std::map<std::string, const TypeInfo*>& parameters) {
+		if(parameters.find(t.name.name) != parameters.end()) {
+			print_type(parameters.at(t.name.name));
+			return;
+		}
+		o << u8"Type_" << t.name.name;
+		if(!t.parameters.empty()) {
+			o << '<';
+			print_type(t.parameters[0], parameters);
+			for(size_t i = 0; i < t.parameters.size(); ++i) {
+				o << ", ";
+				print_type(t.parameters[i], parameters);
+			}
+			o << '>';
+		}
+	}
+
+	void print_type(const VariableType& t, const std::map<std::string, const TypeInfo*>& parameters) {
+		return std::visit(overload(
+		[&](const IntType&){
+			o << u8"🍆::Integer";
+		},
+		[&](const PointerType& pt){
+			print_type(pt, parameters);
+		}
+		), t);
+	}
+
+	void print_type(const Type& t, const std::map<std::string, const TypeInfo*>& parameters) {
+		return std::visit(overload(
+		[&](const VoidType&){
+			o << "void";
+		},
+		[&](const VariableType& vt){
+			print_type(vt, parameters);
+		}
+		), t);
+	}
+
+	void print_function_arguments(const std::vector<std::pair<VariableType, Identifier>>& args, const std::map<std::string, const TypeInfo*>& parameters) {
 		print_data("(");
 		if(!args.empty()) {
-			print_data(u8"🍆::StrongObject<", args[0].first, "> var_", args[0].second);
+			print_data(u8"🍆::StrongObject<");
+			print_type(args[0].first, parameters);
+			print_data("> var_", args[0].second);
 			for(size_t i = 1; i < args.size(); ++i) {
 				print_data(", ");
-				print_data(u8"🍆::StrongObject<", args[i].first, "> var_", args[i].second);
+				print_data(u8"🍆::StrongObject<");
+				print_type(args[i].first, parameters);
+				print_data("> var_", args[i].second);
 			}
 		}
 		print_data(")");
@@ -98,7 +131,7 @@ public:
 		o << arg;
 		print_data(args...);
 	}
-	void print_expression(const Expression& expression) {
+	void print_expression(const Expression& expression, const std::map<std::string, const TypeInfo*>& parameters) {
 		static const char hex_chars[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 		print_data("(");
 		std::visit(overload(
@@ -120,23 +153,27 @@ public:
 			print_data("var_", *e);
 		},
 		[&](const std::unique_ptr<New>& e){
-			print_data(u8"🍆::make_object<", e->type, ">(");
+			print_data(u8"🍆::make_object<");
+			print_type(e->type, parameters);
+			print_data(">(");
 			if(!e->args.empty()) {
-				print_expression(e->args[0]);
+				print_expression(e->args[0], parameters);
 				for(size_t i = 1; i < e->args.size(); ++i) {
 					print_data(", ");
-					print_expression(e->args[i]);
+					print_expression(e->args[i], parameters);
 				}
 			}
 			print_data(")");
 		},
 		[&](const std::unique_ptr<Negation>& e){
-			print_expression(e->value);
+			print_expression(e->value, parameters);
 			print_data("->fun_", e->boolean ? NEG_FUN_NAME : OPP_FUN_NAME, "()");
 		},
 		[&](const std::unique_ptr<Cast>& e){
-			print_data(u8"🍆::cast<", e->target_type, ">(");
-			print_expression(e->value);
+			print_data(u8"🍆::cast<");
+			print_type(e->target_type, parameters);
+			print_data(">(");
+			print_expression(e->value, parameters);
 			print_data(")");
 		},
 		[&](const std::unique_ptr<Null>&){
@@ -146,7 +183,7 @@ public:
 			print_data("_this");
 		},
 		[&](const std::unique_ptr<MemberAccess>& e){
-			print_expression(e->object);
+			print_expression(e->object, parameters);
 			print_data("->", "var_", e->member);
 		},
 		[&](const std::unique_ptr<FunctionCall>& e){
@@ -154,7 +191,7 @@ public:
 				print_data("privfun_", *ee);
 			},
 			[&](const std::unique_ptr<MemberAccess>& ee) {
-				print_expression(ee->object);
+				print_expression(ee->object, parameters);
 				print_data("->", "fun_", ee->member);
 			},
 			[&](const auto&) {
@@ -163,10 +200,10 @@ public:
 			), e->function);
 			print_data("(");
 			if(!e->arguments.empty()) {
-				print_expression(e->arguments[0]);
+				print_expression(e->arguments[0], parameters);
 				for(size_t i = 1; i < e->arguments.size(); ++i) {
 					print_data(", ");
-					print_expression(e->arguments[i]);
+					print_expression(e->arguments[i], parameters);
 				}
 			}
 			print_data(")");
@@ -179,7 +216,7 @@ public:
 			},
 			[&](const std::unique_ptr<MemberAccess>& ee) {
 				print_data(u8"_this{🍆::capture");
-				print_expression(ee->object);
+				print_expression(ee->object, parameters);
 				print_data("}");
 			},
 			[&](const auto&) {
@@ -189,7 +226,7 @@ public:
 
 			for(size_t i = 0; i < e->arguments.size(); ++i) {
 				print_data(", _arg", i, u8"{🍆::capture");
-				print_expression(e->arguments[i].first);
+				print_expression(e->arguments[i].first, parameters);
 				print_data("}");
 			}
 
@@ -215,7 +252,7 @@ public:
 			print_data(");}");
 		},
 		[&](const std::unique_ptr<BinaryOperation>& e){
-			print_expression(e->left);
+			print_expression(e->left, parameters);
 			const char* function_name = nullptr;
 			switch(e->type) {
 			case BinaryOperationType::MUL:
@@ -260,7 +297,7 @@ public:
 			}
 			if(function_name != nullptr) {
 				print_data("->fun_", function_name, "(");
-				print_expression(e->right);
+				print_expression(e->right, parameters);
 				print_data(")");
 			} else {
 				if(e->type == BinaryOperationType::EQUAL) {
@@ -268,14 +305,14 @@ public:
 				} else {
 					print_data(" != ");
 				}
-				print_expression(e->right);
+				print_expression(e->right, parameters);
 			}
 		}
 		), expression);
 		print_data(")");
 	}
 
-	void print_statement(const Statement& statement, bool print_semicolon) {
+	void print_statement(const Statement& statement, bool print_semicolon, const std::map<std::string, const TypeInfo*>& parameters) {
 		std::visit(overload(
 		[&](const std::unique_ptr<Break>&) {
 			print_data("break");
@@ -290,7 +327,7 @@ public:
 			}
 		},
 		[&](const std::unique_ptr<Block>& s) {
-			print_block(*s);
+			print_block(*s, parameters);
 		},
 		[&](const std::unique_ptr<Empty>&) {
 			if(print_semicolon) {
@@ -298,26 +335,28 @@ public:
 			}
 		},
 		[&](const std::unique_ptr<StatementExpression>& s) {
-			print_expression(s->expression);
+			print_expression(s->expression, parameters);
 			if(print_semicolon) {
 				print_data(";");
 			}
 		},
 		[&](const std::unique_ptr<For>& s) {
 			print_data("for(");
-			print_statement(s->before, true);
+			print_statement(s->before, true, parameters);
 			print_data(" ");
-			print_expression(s->condition);
+			print_expression(s->condition, parameters);
 			print_data("; ");
-			print_statement(s->after, false);
+			print_statement(s->after, false, parameters);
 			print_data(")");
-			print_block(*s->body);
+			print_block(*s->body, parameters);
 		},
 		[&](const std::unique_ptr<VariableDeclaration>& s) {
-			print_data(u8"🍆::StrongObject<", s->type, "> var_", s->name);
+			print_data(u8"🍆::StrongObject<");
+			print_type(s->type, parameters);
+			print_data("> var_", s->name);
 			if(s->value) {
 				print_data(" = ");
-				print_expression(*s->value);
+				print_expression(*s->value, parameters);
 			}
 			if(print_semicolon) {
 				print_data(";");
@@ -326,7 +365,7 @@ public:
 		[&](const std::unique_ptr<VariableAuto>& s) {
 			print_data("auto var_", s->name);
 			print_data(" = ");
-			print_expression(s->value);
+			print_expression(s->value, parameters);
 			if(print_semicolon) {
 				print_data(";");
 			}
@@ -335,10 +374,10 @@ public:
 			print_data("return");
 			if(!s->values.empty()) {
 				print_data(u8" 🍆::make_return_value(");
-				print_expression(s->values[0]);
+				print_expression(s->values[0], parameters);
 				for(size_t i = 1; i < s->values.size(); ++i) {
 					print_data(", ");
-					print_expression(s->values[i]);
+					print_expression(s->values[i], parameters);
 				}
 				print_data(")");
 			}
@@ -348,25 +387,25 @@ public:
 		},
 		[&](const std::unique_ptr<If>& s) {
 			print_data("if(");
-			print_expression(s->condition);
+			print_expression(s->condition, parameters);
 			print_data(")");
-			print_block(*s->body);
+			print_block(*s->body, parameters);
 			if(s->body_else) {
 				print_indentation();
 				print_data("else ");
-				print_block(**s->body_else);
+				print_block(**s->body_else, parameters);
 			}
 		},
 		[&](const std::unique_ptr<While>& s) {
 			print_data("while(");
-			print_expression(s->condition);
+			print_expression(s->condition, parameters);
 			print_data(")");
-			print_block(*s->body);
+			print_block(*s->body, parameters);
 		},
 		[&](const std::unique_ptr<Assignment>& s) {
-			print_expression(s->variable);
+			print_expression(s->variable, parameters);
 			print_data(" = ");
-			print_expression(s->value);
+			print_expression(s->value, parameters);
 			if(print_semicolon) {
 				print_data(";");
 			}
@@ -374,13 +413,13 @@ public:
 		), statement);
 	}
 
-	void print_block(const Block& b) {
+	void print_block(const Block& b, const std::map<std::string, const TypeInfo*>& parameters) {
 		print_data("{");
 		print_endline();
 		add_level();
 		for(const Statement& s : b.statements) {
 			print_indentation();
-			print_statement(s, true);
+			print_statement(s, true, parameters);
 			print_endline();
 		}
 		remove_level();
@@ -388,92 +427,84 @@ public:
 	}
 };
 
-void print(const ParsedModule& m) {
-	std::string ext(FILENAME_EXTENSION);
-	std::string header_filename = m.path;
-	header_filename.resize(header_filename.size() - ext.size());
-	header_filename += ".h";
-	OutputFile header(header_filename);
-	std::string source_filename = header_filename;
-	source_filename.back() = 'c';
-	source_filename += "pp";
-	OutputFile source(source_filename);
+}
 
-	header.print_line("#pragma once");
-	header.print_line();
+namespace typechecker {
 
-	auto is_acceptable_path = [](const std::string& path) {
-		static const std::vector<std::string> forbidden{"'", "\\", "//", "/*"};
-		for(const std::string& f : forbidden) {
-			if(path.find(f) != path.npos) {
-				return false;
-			}
-		}
-		return true;
-	};
+void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
+	OutputFile output(o);
+
+	output.print_line(u8"#include <🍆>");
+	output.print_line();
 
 	{
-		std::string imported_header = get_file_name_from_absolute_path(header_filename);
-
-		if(!is_acceptable_path(imported_header)) {
-			throw CppBackendError("Unsupported characters in imported module path " + imported_header);
-		}
-		source.print_line("#include \"", imported_header, "\"");
-		source.print_line();
-
-		header.print_line(u8"#include <🍆>");
-		header.print_line();
-
-	}
-
-	for(const std::string& import : m.module.imports) {
-		std::string import_header = import;
-		import_header.resize(import_header.size() - ext.size());
-		import_header += ".h";
-		if(!is_acceptable_path(import_header)) {
-			throw CppBackendError("Unsupported characters in imported module path " + import_header);
-		}
-		header.print_line("#include \"", import_header, '"');
-	}
-	header.print_line();
-
-	for(const Class& c : m.module.classes) {
-		auto print_base_template_declaration = [&](){
-			header.print_indentation();
-			header.print_data("template <typename Void");
-			for(const auto& p : c.parameters) {
-				header.print_data(", typename Type_", p);
+		std::set<std::string> patterns;
+		for(const RealClassInfo* c_ : classes) {
+			const Class& ast_data = *RealClassInfoView(*c_).ast_data;
+			if(!patterns.count(ast_data.name.name)) {
+				patterns.insert(ast_data.name.name);
+				if(!ast_data.parameters.empty()) {
+					output.print_indentation();
+					output.print_data("template <typename");
+					for(size_t i = 0; i < ast_data.parameters.size(); ++i) {
+						output.print_data(", typename");
+					}
+					output.print_data('>');
+					output.print_endline();
+				}
+				output.print_line(ast_data.public_variables ? "struct " : "class ", "Type_", ast_data.name, ';');
+				output.print_line();
 			}
-			header.print_data('>');
-			header.print_endline();
-		};
-		print_base_template_declaration();
-		header.print_line(c.public_variables ? "struct " : "class Type_", c.name, ";");
-		header.print_line();
-		print_base_template_declaration();
-		header.print_indentation();
-		header.print_data(c.public_variables ? "struct " : "class ", "Base_", c.name);
-		if(c.superclass) {
-			header.print_data(" : public ", *c.superclass);
 		}
-		header.print_data(" {");
-		header.print_endline();
-		header.add_level();
-		header.print_line(u8"🍆::WeakObject<Type_" , c.name, "> _this;");
-		for(const ClassVariable& var : c.variables) {
+	}
+
+	for(const RealClassInfo* c_ : classes) {
+		const RealClassInfoView c(*c_);
+		const Class& ast_data = *RealClassInfoView(*c_).ast_data;
+		std::map<std::string, const TypeInfo*> parameters;
+		for(size_t i = 0; i < c.parameters.size(); ++i) {
+			parameters.emplace(ast_data.parameters[i].name, c.parameters[i]);
+		}
+
+		if(!c.parameters.empty()) {
+			output.print_line("template <>");
+		} else {
+			output.print_line(u8"#ifndef 🍆", ast_data.name);
+			output.print_line(u8"#define 🍆", ast_data.name);
+		}
+		output.print_indentation();
+		output.print_data(ast_data.public_variables ? "struct " : "class ");
+
+		output.print_type(c_);
+
+		if(ast_data.superclass) {
+			output.print_data(" : public ");
+			output.print_type(*ast_data.superclass, parameters);
+		}
+		output.print_data(" {");
+		output.print_endline();
+		output.add_level();
+		output.print_line(u8"🍆::WeakObject<Type_" , ast_data.name, "> _this;");
+		for(const ClassVariable& var : ast_data.variables) {
 			std::visit(overload(
 			[&](const ClassVariableInteger& i) {
-				header.print_line(u8"🍆::Integer var_", i.name, ';');
+				output.print_line(u8"🍆::Integer var_", i.name, ';');
 			},
 			[&](const ClassVariablePointer& p) {
-				header.print_line(u8"🍆::", p.strong ? "Strong" : "Weak", "Object<" , p.type, "> var_", p.name, ';');
+				output.print_indentation();
+				output.print_data(u8"🍆::", p.strong ? "Strong" : "Weak", "Object<");
+				output.print_type(p.type, parameters);
+				output.print_data("> var_", p.name, ';');
+				output.print_endline();
 			}
 			), var);
 		}
-		header.remove_level();
-		header.print_line("public:");
-		header.add_level();
-
+		if(!ast_data.public_variables) {
+			output.remove_level();
+			output.print_line("public:");
+			output.add_level();
+		}
+/*
 		{
 			if(c.destructor) {
 				header.print_indentation();
@@ -587,30 +618,35 @@ void print(const ParsedModule& m) {
 				header.print_line();
 			}
 		}
+		*/
 
-		header.remove_level();
-		header.print_line("}");
-		header.print_line();
+		output.remove_level();
+		output.print_line("};");
+		if(c.parameters.empty()) {
+			output.print_line("#endif");
+		}
+		output.print_line();
 
+/*
 		auto print_template_args = [&](OutputFile& o){
-			if(c.parameters.empty()) {
+			if(ast_data.parameters.empty()) {
 				return;
 			}
-			o.print_data("<void");
-			for(size_t i = 0; i < c.parameters.size(); ++i) {
-				o.print_data(", Type_", c.parameters[i]);
+			o.print_data("<Type_", ast_data.parameters[0]);
+			for(size_t i = 1; i < ast_data.parameters.size(); ++i) {
+				o.print_data(", Type_", ast_data.parameters[i]);
 			}
 			o.print_data(">");
 		};
 
 		{
-			print_base_template_declaration();
-			header.print_indentation();
-			header.print_data("struct 🍆::has_journal<Type_", c.name);
-			print_template_args(header);
-			header.print_data("> : public 🍆::", c.nojournal ? "false" : "true", "_type {}");
-			header.print_endline();
-			header.print_line();
-		}
+			output.print_indentation();
+			output.print_data("struct 🍆::has_journal<Type_", ast_data.name);
+			print_template_args(output);
+			output.print_data("> : public 🍆::", ast_data.nojournal ? "false" : "true", "_type {}");
+			output.print_endline();
+			output.print_line();
+		}*/
 	}
+}
 }

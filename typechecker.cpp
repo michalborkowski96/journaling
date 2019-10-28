@@ -24,6 +24,40 @@ void TypeError::fill_filename_if_empty(std::shared_ptr<const std::string> fname)
 	}
 }
 
+RealClassInfoView::RealClassInfoView(const RealClassInfo& rci) : parameters(rci.parameters), superclass(rci.superclass), variables(rci.variables), functions(rci.functions), constructors(rci.constructors), ast_data(rci.ast_data) {}
+
+bool TypeError::operator==(const TypeError& o) const {
+	if(begin != o.begin || end != o.end || data != o.data || (bool) filename != (bool) o.filename || context.size() != o.context.size()) {
+		return false;
+	}
+	if(filename && (*filename) != (*o.filename)) {
+		return false;
+	}
+	for(size_t i = 0; i < context.size(); ++i) {
+		if((*context[i]) != (*o.context[i])) {
+			return false;
+		}
+	}
+	return true;
+}
+
+void TypeError::contract_errors(std::vector<TypeError>& errors) {
+	std::vector<TypeError> new_errors;
+	for(TypeError& e : errors) {
+		bool found = false;
+		for(size_t i = 0; i < new_errors.size(); ++i) {
+			if(new_errors[i] == e) {
+				found = true;
+				break;
+			}
+		}
+		if(!found) {
+			new_errors.push_back(std::move(e));
+		}
+	}
+	errors.swap(new_errors);
+}
+
 void TypeError::add_context(std::shared_ptr<const std::string> ctx){
 	context.push_back(ctx);
 }
@@ -314,92 +348,84 @@ public:
 	virtual ~NullTypeInfo() = default;
 };
 
-class VoidTypeInfo : public TypeInfo {
-	virtual bool implicitly_convertible_from(const RealClassInfo*) const override {
-		return false;
-	}
-	virtual bool implicitly_convertible_from(const NullTypeInfo*) const override {
-		return false;
-	}
-	virtual bool implicitly_convertible_from(const IntTypeInfo*) const override {
-		return false;
-	}
-	virtual bool implicitly_convertible_from(const TemplateUnknownTypeInfo*) const override {
-		return false;
-	}
-	virtual bool implicitly_convertible_from(const VoidTypeInfo*) const override {
-		return true;
-	}
-public:
-	virtual bool check_nojournal_mark(bool mark) const override {
-		return !mark;
-	}
-	virtual bool implicitly_convertible_to(const TypeInfo* o) const override {
-		return o->implicitly_convertible_from(this);
-	}
-	virtual std::string full_name() const override {
-		return VOID_TYPE_NAME;
-	}
-	virtual std::optional<const TypeInfo*> get_member(const std::string&) const override {
+bool VoidTypeInfo::implicitly_convertible_from(const RealClassInfo*) const {
+	return false;
+}
+bool VoidTypeInfo::implicitly_convertible_from(const NullTypeInfo*) const {
+	return false;
+}
+bool VoidTypeInfo::implicitly_convertible_from(const IntTypeInfo*) const {
+	return false;
+}
+bool VoidTypeInfo::implicitly_convertible_from(const TemplateUnknownTypeInfo*) const {
+	return false;
+}
+bool VoidTypeInfo::implicitly_convertible_from(const VoidTypeInfo*) const {
+	return true;
+}
+
+bool VoidTypeInfo::check_nojournal_mark(bool mark) const {
+	return !mark;
+}
+bool VoidTypeInfo::implicitly_convertible_to(const TypeInfo* o) const {
+	return o->implicitly_convertible_from(this);
+}
+std::string VoidTypeInfo::full_name() const {
+	return VOID_TYPE_NAME;
+}
+std::optional<const TypeInfo*> VoidTypeInfo::get_member(const std::string&) const {
+	return std::nullopt;
+}
+
+bool IntTypeInfo::implicitly_convertible_from(const RealClassInfo*) const {
+	return false;
+}
+bool IntTypeInfo::implicitly_convertible_from(const NullTypeInfo*) const {
+	return true;
+}
+bool IntTypeInfo::implicitly_convertible_from(const IntTypeInfo*) const {
+	return true;
+}
+bool IntTypeInfo::implicitly_convertible_from(const TemplateUnknownTypeInfo*) const {
+	return true;
+}
+std::map<std::string, std::unique_ptr<BuiltinIntFunctionInfo>> IntTypeInfo::get_funs_map(const IntTypeInfo* int_type) {
+	std::map<std::string, std::unique_ptr<BuiltinIntFunctionInfo>> funs;
+	auto ins = [&](const char* name, bool arg){
+		funs.emplace(std::string(name), std::make_unique<BuiltinIntFunctionInfo>(int_type, name, arg));
+	};
+	ins(ADD_FUN_NAME, true);
+	ins(SUB_FUN_NAME, true);
+	ins(MUL_FUN_NAME, true);
+	ins(DIV_FUN_NAME, true);
+	ins(OR_FUN_NAME, true);
+	ins(AND_FUN_NAME, true);
+	ins(NEG_FUN_NAME, false);
+	ins(OPP_FUN_NAME, false);
+	ins(MOD_FUN_NAME, true);
+	ins(LESS_FUN_NAME, true);
+	ins(LESS_EQUAL_FUN_NAME, true);
+	ins(MORE_FUN_NAME, true);
+	ins(MORE_EQUAL_FUN_NAME, true);
+	return funs;
+}
+IntTypeInfo::IntTypeInfo() : funs(get_funs_map(this)) {}
+bool IntTypeInfo::check_nojournal_mark(bool mark) const {
+	return !mark;
+}
+bool IntTypeInfo::implicitly_convertible_to(const TypeInfo* o) const {
+	return o->implicitly_convertible_from(this);
+}
+std::string IntTypeInfo::full_name() const {
+	return INT_TYPE_NAME;
+}
+std::optional<const TypeInfo*> IntTypeInfo::get_member(const std::string& name) const {
+	auto it = funs.find(name);
+	if(it == funs.end()) {
 		return std::nullopt;
 	}
-	virtual ~VoidTypeInfo() = default;
-};
-
-class IntTypeInfo : public TypeInfo {
-	const std::map<std::string, std::unique_ptr<BuiltinIntFunctionInfo>> funs;
-	virtual bool implicitly_convertible_from(const RealClassInfo*) const override {
-		return false;
-	}
-	virtual bool implicitly_convertible_from(const NullTypeInfo*) const override {
-		return true;
-	}
-	virtual bool implicitly_convertible_from(const IntTypeInfo*) const override {
-		return true;
-	}
-	virtual bool implicitly_convertible_from(const TemplateUnknownTypeInfo*) const override {
-		return true;
-	}
-	static std::map<std::string, std::unique_ptr<BuiltinIntFunctionInfo>> get_funs_map(const IntTypeInfo* int_type) {
-		std::map<std::string, std::unique_ptr<BuiltinIntFunctionInfo>> funs;
-		auto ins = [&](const char* name, bool arg){
-			funs.emplace(std::string(name), std::make_unique<BuiltinIntFunctionInfo>(int_type, name, arg));
-		};
-		ins(ADD_FUN_NAME, true);
-		ins(SUB_FUN_NAME, true);
-		ins(MUL_FUN_NAME, true);
-		ins(DIV_FUN_NAME, true);
-		ins(OR_FUN_NAME, true);
-		ins(AND_FUN_NAME, true);
-		ins(NEG_FUN_NAME, false);
-		ins(OPP_FUN_NAME, false);
-		ins(MOD_FUN_NAME, true);
-		ins(LESS_FUN_NAME, true);
-		ins(LESS_EQUAL_FUN_NAME, true);
-		ins(MORE_FUN_NAME, true);
-		ins(MORE_EQUAL_FUN_NAME, true);
-		return funs;
-	}
-public:
-	IntTypeInfo() : funs(get_funs_map(this)) {}
-	virtual bool check_nojournal_mark(bool mark) const override {
-		return !mark;
-	}
-	virtual bool implicitly_convertible_to(const TypeInfo* o) const override {
-		return o->implicitly_convertible_from(this);
-	}
-	virtual std::string full_name() const override {
-		return INT_TYPE_NAME;
-	}
-	virtual std::optional<const TypeInfo*> get_member(const std::string& name) const override {
-		auto it = funs.find(name);
-		if(it == funs.end()) {
-			return std::nullopt;
-		}
-		return it->second->type_info();
-	}
-	virtual ~IntTypeInfo() = default;
-};
+	return it->second->type_info();
+}
 
 class TemplateUnknownTypeInfo : public TypeInfo {
 	std::string name;
@@ -442,10 +468,13 @@ public:
 std::optional<ExpressionCheckResult> check_expression(std::vector<TypeError>& errors, const VariableMap& variable_map, ClassDatabase& class_database, const Expression& e);
 std::optional<std::vector<TypeError>> check_function_block(const TypeInfo* return_type, const std::optional<std::vector<const TypeInfo*>>& dual, VariableMap& variable_map, ClassDatabase& class_database, const Block& block);
 
-RealClassInfo::RealClassInfo(decltype(parameters) parameters, decltype(superclass) superclass, decltype(ast_data) ast_data) : parameters(move(parameters)), superclass(move(superclass)), ast_data(ast_data) {}
+RealClassInfo::RealClassInfo(std::vector<const TypeInfo*> parameters, std::optional<const TypeInfo*> superclass, const ast::Class* ast_data) : parameters(move(parameters)), superclass(move(superclass)), ast_data(ast_data) {}
 
 bool RealClassInfo::implicitly_convertible_from(const RealClassInfo* o) const {
 	if(this == o) {
+		return true;
+	}
+	if(has_unknown_parameters() || o->has_unknown_parameters()) {
 		return true;
 	}
 	const TypeInfo* superclass = o;
@@ -782,6 +811,10 @@ std::string types_to_string(const std::vector<const TypeInfo*>& v) {
 	return arg_types;
 }
 
+bool RealClassInfo::comes_from_same_pattern(const RealClassInfo& o) const {
+	return ast_data == o.ast_data;
+}
+
 std::variant<std::unique_ptr<RealFunctionInfo>, std::vector<TypeError>> RealFunctionInfo::make_function_declaration(std::optional<const RealFunctionInfo*> overridden, ClassDatabase& class_database, const Function* ast) {
 	std::vector<TypeError> errors;
 	const TypeInfo* rt;
@@ -823,11 +856,36 @@ std::variant<std::unique_ptr<RealFunctionInfo>, std::vector<TypeError>> RealFunc
 
 	if(overridden) {
 		const RealFunctionInfo& fi = **overridden;
-		if(fi.arguments != args) {
-			errors.emplace_back(ast->name, "Function overrides another function, but has different arguments, (" + types_to_string(args) + ") instead of (" + types_to_string(fi.arguments) + ").");
+		auto same_types = [](const TypeInfo* a, const TypeInfo* b){
+			if(dynamic_cast<const TemplateUnknownTypeInfo*>(a) || dynamic_cast<const TemplateUnknownTypeInfo*>(b)) {
+				return true;
+			}
+			auto aa = dynamic_cast<const RealClassInfo*>(a);
+			auto ab = dynamic_cast<const RealClassInfo*>(b);
+			if(aa && ab) {
+				if(!aa->has_unknown_parameters() && !ab->has_unknown_parameters()) {
+					return a == b;
+				}
+				return aa->comes_from_same_pattern(*ab);
+			}
+			return a == b;
+		};
+		{
+			bool same_arg_count = fi.arguments.size() == args.size();
+			bool same_arg_types = true;
+			if(same_arg_count) {
+				for(size_t i = 0; i < fi.arguments.size(); ++i) {
+					if(!same_types(fi.arguments[i], args[i])) {
+						same_arg_types = false;
+					}
+				}
+			}
+			if(!same_arg_count || !same_arg_types) {
+				errors.emplace_back(ast->name, "Function overrides another function, but has different arguments, (" + types_to_string(args) + " instead of " + types_to_string(fi.arguments) + ").");
+			}
 		}
-		if(!rt->implicitly_convertible_to(fi.return_type)) {
-			errors.emplace_back(ast->name, "Function overrides another function, but its return type " + rt->full_name() + " isn't implicitly convertible to " + fi.return_type->full_name() + ".");
+		if(!same_types(rt, fi.return_type)) {
+			errors.emplace_back(ast->name, "Function overrides another function, but has different return type, (" + rt->full_name() + " instead of " + fi.return_type->full_name() + ").");
 		}
 		if(ast->kind != fi.kind()) {
 			errors.emplace_back(ast->name, "Function overrides another function, but has different kind.");
@@ -1405,6 +1463,7 @@ std::optional<std::vector<TypeError>> ClassDatabase::insert_pattern(const Class*
 			oe.fill_filename_if_empty(filename);
 			oe.add_context(context);
 		}
+		temporary_types_with_unknown_parameters.clear();
 		if(!r.second.empty()) {
 			return std::move(r.second);
 		}
@@ -1413,8 +1472,8 @@ std::optional<std::vector<TypeError>> ClassDatabase::insert_pattern(const Class*
 			if(types.find(p->name.name) != types.end()) {
 				throw std::runtime_error("Internal error.");
 			}
-			classes_order.emplace_back(std::move(r.first));
-			types[p->name.name][{}] = classes_order.back();
+			classes_order.emplace_back(r.first.get());
+			types[p->name.name][{}] = std::move(r.first);
 		}
 		return std::nullopt;
 	},
@@ -1423,9 +1482,24 @@ std::optional<std::vector<TypeError>> ClassDatabase::insert_pattern(const Class*
 			oe.fill_filename_if_empty(filename);
 			oe.add_context(context);
 		}
+		temporary_types_with_unknown_parameters.clear();
 		return e;
 	}
 	), RealClassInfo::make_class(*this, p));
+}
+
+bool RealClassInfo::has_unknown_parameters() const {
+	for(const TypeInfo* p : parameters) {
+		if(dynamic_cast<const TemplateUnknownTypeInfo*>(p)) {
+			return true;
+		}
+		if(const RealClassInfo* pp = dynamic_cast<const RealClassInfo*>(p)) {
+			if(pp->has_unknown_parameters()) {
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 ClassDatabase::NonOwnedParameter::NonOwnedParameter(ClassDatabase* cd, std::string name, const TypeInfo* type) : cd(cd), name(move(name)) {
@@ -1512,8 +1586,12 @@ std::variant<const TypeInfo*, std::vector<TypeError>> ClassDatabase::get(const P
 				optional_errors.push_back(std::move(oe));
 			}
 			RealClassInfo* ci = r.first.get();
-			classes_order.push_back(std::move(r.first));
-			types[t.name.name][params] = classes_order.back();
+			if(!ci->has_unknown_parameters()) {
+				classes_order.push_back(ci);
+				types[t.name.name][params] = std::move(r.first);
+			} else {
+				temporary_types_with_unknown_parameters.push_back(std::move(r.first));
+			}
 			return ci;
 		},
 		[&](std::vector<TypeError> e)->std::variant<const TypeInfo*, std::vector<TypeError>>{
@@ -1544,11 +1622,11 @@ bool VariableMap::has(const std::string& name) const {
 	return false;
 }
 
-std::vector<std::shared_ptr<const RealClassInfo>> ClassDatabase::get_move_ordered() {
-	return move(classes_order);
+const std::vector<const RealClassInfo*>& ClassDatabase::get_ordered() const {
+	return classes_order;
 }
 
-std::pair<std::pair<std::vector<TypeError>, std::vector<TypeError>>, std::vector<std::shared_ptr<const RealClassInfo>>> typecheck(const std::vector<ParsedModule>& modules) {
+std::pair<std::pair<std::vector<TypeError>, std::vector<TypeError>>, ClassDatabase> typecheck(const std::vector<ParsedModule>& modules) {
 	std::vector<TypeError> errors;
 	ClassDatabase class_database;
 	for(const ParsedModule& m : modules) {
@@ -1557,7 +1635,7 @@ std::pair<std::pair<std::vector<TypeError>, std::vector<TypeError>>, std::vector
 			call_with_error_log(errors, class_database.insert_pattern(&c, path));
 		}
 	}
-	return std::make_pair(std::make_pair(std::move(errors), class_database.get_optional_errors()), class_database.get_move_ordered());
+	return std::make_pair(std::make_pair(std::move(errors), class_database.get_optional_errors()), std::move(class_database));
 }
 
 }

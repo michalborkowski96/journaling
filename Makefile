@@ -8,7 +8,7 @@ all: 🍆
 %.o: %.cpp *.h
 	${CC} $< ${FLAGS} -c
 
-🍆: ast.o cpp_backend.o lexer.o main.o parser.o system_posix.o system.h typechecker.o util.o
+🍆: ast.o cpp_backend.o lexer.o main.o parser.o system_posix.o system_posix.o typechecker.o util.o
 	${CC} $^ -o 🍆
 
 clean:

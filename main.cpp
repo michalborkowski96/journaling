@@ -4,38 +4,36 @@
 #include "lexer.h"
 #include "parser.h"
 #include "typechecker.h"
-#include "cpp_backend.h"
 
 int print_help(){
-	std::cout<<"Program expected one argument, which is the file name.\n";
+	std::cerr<<"Program expected one argument, which is the file name.\n";
 	return 1;
 }
 
 int main(int argc, char* argv[]){
-	std::ostream& out = std::cout;
 	if(argc != 2) {
 		return print_help();
 	}
-	std::pair<std::pair<std::vector<typechecker::TypeError>, std::vector<typechecker::TypeError>>, std::vector<std::shared_ptr<const typechecker::RealClassInfo>>> typechecker_result;
+	std::pair<std::pair<std::vector<typechecker::TypeError>, std::vector<typechecker::TypeError>>, typechecker::ClassDatabase> typechecker_result;
 	std::vector<ParsedModule> parsed_program;
 	try {
 		parsed_program = parse_program(argv[1]);
 	} catch(const ParserError& e) {
-		out << e;
-		out << RED << "FAILURE!\n" << ENDCOLOUR;
+		std::cerr << e;
+		std::cerr << RED << "FAILURE!\n" << ENDCOLOUR;
 		return 1;
 	}
 	typechecker_result = typechecker::typecheck(parsed_program);
+	typechecker::TypeError::contract_errors(typechecker_result.first.first);
+	typechecker::TypeError::contract_errors(typechecker_result.first.second);
 	if(typechecker_result.first.first.empty()) {
-		for(const ParsedModule& m : parsed_program) {
-			print(m);
-		}
+		print(std::cout, typechecker_result.second.get_ordered());
 	}
-	typechecker::TypeError::print_errors(std::cout, parsed_program, typechecker_result.first);
+	typechecker::TypeError::print_errors(std::cerr, parsed_program, typechecker_result.first);
 	if(typechecker_result.first.first.empty()) {
-		out << GREEN << "OK!\n" << ENDCOLOUR;
+		std::cerr << GREEN << "OK!\n" << ENDCOLOUR;
 	} else {
-		out << RED << "FAILURE!\n" << ENDCOLOUR;
+		std::cerr << RED << "FAILURE!\n" << ENDCOLOUR;
 		return 1;
 	}
 }
