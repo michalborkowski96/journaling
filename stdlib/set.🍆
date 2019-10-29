@@ -1,5 +1,6 @@
 import "container.🍆"
 import "avl_.🍆"
+import "integer.🍆"
 
 Set T : Container<T, AVLNode_<T>> {
 	int size_;
@@ -63,18 +64,18 @@ Set T : Container<T, AVLNode_<T>> {
 		return z.parent;
 	} irreversible;
 
-	fun Pair<int, T> insert(T entry) {
+	fun Pair<Integer, T> insert(T entry) {
 		var AVLNode_<T> node = end_.left_son;
 		if(node == null) {
 			end_.left_son = new AVLNode_<T>(entry, end_);
-			return new Pair<int, T>(0, null), null, 0;
+			return new Pair<Integer, T>(new Integer(0), null), null, 0;
 		}
 		while(1) {
 			var T k = node.deref();
 			if(comparator_.eq(entry, k)) {
 				var T old = node.deref();
 				node.set(entry);
-				return new Pair<int, T>(1, old), old, 1;
+				return new Pair<Integer, T>(new Integer(1), old), old, 1;
 			}
 			if(comparator_.less(entry, k)) {
 				if(node.left_son != null) {
@@ -98,7 +99,7 @@ Set T : Container<T, AVLNode_<T>> {
 		while(z.parent != null) {
 			z = rebalance_(z);
 		}
-		return new Pair<int, T>(0, null), null, 0;
+		return new Pair<Integer, T>(new Integer(0), null), null, 0;
 	} dual (T old, int had_old) {
 		if(had_old) {
 			insert(old);
@@ -107,10 +108,10 @@ Set T : Container<T, AVLNode_<T>> {
 		}
 	};
 
-	fun Pair<int, T> erase(T key) {
+	fun Pair<Integer, T> erase(T key) {
 		var AVLNode_<T> node = find(key);
 		if(node.equals(end_)) {
-			return new Pair<int, T>(0, null), null, 0;
+			return new Pair<Integer, T>(new Integer(0), null), null, 0;
 		}
 		var T old = node.deref();
 		if(node.left_son == null && node.right_son == null) {
@@ -146,7 +147,7 @@ Set T : Container<T, AVLNode_<T>> {
 		while(node.parent != null) {
 			node = rebalance_(node);
 		}
-		return new Pair<int, T>(0, old), old, 0;
+		return new Pair<Integer, T>(new Integer(0), old), old, 0;
 	} dual (T old, int had_old) {
 		if(had_old) {
 			insert(old);

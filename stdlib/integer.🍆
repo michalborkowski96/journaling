@@ -1,0 +1,53 @@
+import "streamdef_.🍆"
+
+nojournal Integer {
+	int value;
+	fun int to_int() {
+		return value;
+	};
+	constructor(int v) {
+		value = v;
+	};
+	fun Integer add(Integer o) {
+		return new Integer(value + o.to_int());
+	};
+	fun Integer sub(Integer o) {
+		return new Integer(value - o.to_int());
+	};
+	fun Integer mul(Integer o) {
+		return new Integer(value * o.to_int());
+	};
+	fun Integer div(Integer o) {
+		return new Integer(value / o.to_int());
+	};
+	fun Integer mod(Integer o) {
+		return new Integer(value % o.to_int());
+	};
+	fun Integer alt(Integer o) {
+		return new Integer(value || o.to_int());
+	};
+	fun int less(Integer o) {
+		return value < o.to_int();
+	};
+	fun int le(Integer o) {
+		return value <= o.to_int();
+	};
+	fun int more(Integer o) {
+		return value > o.to_int();
+	};
+	fun int me(Integer o) {
+		return value >= o.to_int();
+	};
+	fun Integer opp() {
+		return new Integer(-value);
+	};
+	fun int neg() {
+		return !value;
+	};
+	fun int con(Integer o) {
+		return value && o.to_int();
+	};
+	fun void print(OutputStream o) {
+		o.print_int(value);	
+	};
+}

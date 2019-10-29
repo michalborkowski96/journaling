@@ -1,5 +1,6 @@
 import "container.🍆"
 import "avl_.🍆"
+import "integer.🍆"
 import "pair.🍆"
 import "set.🍆"
 
@@ -38,13 +39,13 @@ Map K V : Container<Pair<K, V>, AVLNode_<Pair<K, V>>> {
 		return data.find(new Pair<K, V>(key, null));
 	} noeffect;
 
-	fun Pair<int, Pair<K, V>> insert_kv(K key, V value) {
+	fun Pair<Integer, Pair<K, V>> insert_kv(K key, V value) {
 		return this.insert(new Pair<K, V>(key, value));
 	} dual (){};
 
-	fun Pair<int, Pair<K, V>> insert(Pair<K, V> entry) {
-		var Pair<int, Pair<K, V>> old = data.insert(entry);
-		if(old.first) {
+	fun Pair<Integer, Pair<K, V>> insert(Pair<K, V> entry) {
+		var Pair<Integer, Pair<K, V>> old = data.insert(entry);
+		if(old.first.to_int()) {
 			return old, old.second, true;
 		} else {
 			return old, new Pair<K, V>(entry.first, null), false;
@@ -57,16 +58,16 @@ Map K V : Container<Pair<K, V>, AVLNode_<Pair<K, V>>> {
 		}
 	};
 
-	fun Pair<int, V> erase(K key) {
-		var Pair<int, Pair<K, V>> old = data.erase(new Pair<K, V>(key, null));
+	fun Pair<Integer, V> erase(K key) {
+		var Pair<Integer, Pair<K, V>> old = data.erase(new Pair<K, V>(key, null));
 		var V v;
 		if(old.second != null) {
 			v = old.second.second;
 		}
-		if(old.first) {
-			return new Pair<int, V>(old.first, v), old.second, true;
+		if(old.first.to_int()) {
+			return new Pair<Integer, V>(old.first, v), old.second, true;
 		} else {
-			return new Pair<int, V>(old.first, v), null, false;
+			return new Pair<Integer, V>(old.first, v), null, false;
 		}
 	} dual (Pair<K, V> old, int had_old) {
 		if(had_old) {

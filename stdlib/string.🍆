@@ -18,5 +18,5 @@ nojournal String {
 	fun int me(String s) {return null;};
 
 	constructor() {};
-	constructor(int char_ptr) {};
+	constructor(int char_ptr, int length) {};
 }

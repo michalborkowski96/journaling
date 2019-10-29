@@ -932,9 +932,9 @@ std::optional<ExpressionCheckResult> check_expression(std::vector<TypeError>& er
 	[&](const std::unique_ptr<StringLiteral>& e)->std::optional<ExpressionCheckResult>{
 		auto t = class_database.get_for_string();
 		if(t) {
-			auto construct_result = (**t).constructible_with({class_database.get_for_int()});
+			auto construct_result = (**t).constructible_with({class_database.get_for_int(), class_database.get_for_int()});
 			if(!construct_result) {
-				errors.emplace_back(*e, "String class must have int contructor to use string literals.");
+				errors.emplace_back(*e, "String class must have (int, int) contructor to use string literals.");
 				return std::nullopt;
 			} else {
 				return ExpressionCheckResult(*t, false);
@@ -1434,8 +1434,15 @@ std::optional<const TypeInfo*> RealFunctionInfo::call_with(const std::vector<con
 }
 
 std::optional<std::vector<TypeError>> ClassDatabase::insert_pattern(const Class* p, std::shared_ptr<const std::string> filename) {
+	auto context = std::make_shared<std::string>(p->parameters.empty() ? "During instatiation of the class " + p->name.name + "." : "During pattern type checking of class pattern " + p->name.name + ".");
+	auto make_error = [&](const AstNode& n, std::string s){
+		std::vector<TypeError> err{TypeError(n, std::move(s))};
+		err[0].fill_filename_if_empty(filename);
+		err[0].add_context(context);
+		return err;
+	};
 	if(patterns.find(p->name.name) != patterns.end()) {
-		return std::vector<TypeError>{TypeError(p->name, "Class pattern redefinition.")};
+		return make_error(p->name, "Class pattern redefinition.");
 	}
 	std::vector<std::unique_ptr<const TypeInfo>> param_ti;
 	std::vector<NonOwnedParameter> param_nop;
@@ -1443,7 +1450,7 @@ std::optional<std::vector<TypeError>> ClassDatabase::insert_pattern(const Class*
 		std::set<std::string> names;
 		for(const Identifier& i : p->parameters) {
 			if(names.count(i.name) || patterns.find(i.name) != patterns.end()) {
-				return std::vector<TypeError>{TypeError(i, "Type parameter shadows another type related identifier.")};
+				return make_error(i, "Type parameter shadows another type related identifier.");
 			}
 			names.insert(i.name);
 		}
@@ -1456,7 +1463,7 @@ std::optional<std::vector<TypeError>> ClassDatabase::insert_pattern(const Class*
 			param_ti.push_back(std::move(t));
 		}
 	}
-	auto context = std::make_shared<std::string>(p->parameters.empty() ? "During instatiation of the class " + p->name.name + "." : "During pattern type checking of class pattern " + p->name.name + ".");
+	size_t optional_error_count = optional_errors.size();
 	return std::visit(overload(
 	[&](std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>> r)->std::optional<std::vector<TypeError>>{
 		for(TypeError& oe : r.second) {
@@ -1466,6 +1473,14 @@ std::optional<std::vector<TypeError>> ClassDatabase::insert_pattern(const Class*
 		temporary_types_with_unknown_parameters.clear();
 		if(!r.second.empty()) {
 			return std::move(r.second);
+		} else {
+			for(TypeError& oe : r.second) {
+				oe.fill_filename_if_empty(filename);
+				optional_errors.push_back(std::move(oe));
+			}
+			for(size_t i = optional_error_count; i < optional_errors.size() - r.second.size(); ++i) {
+				optional_errors[i].add_context(context);
+			}
 		}
 		patterns.emplace(p->name.name, std::make_pair(p, filename));
 		if(p->parameters.empty()) {
@@ -1577,13 +1592,17 @@ std::variant<const TypeInfo*, std::vector<TypeError>> ClassDatabase::get(const P
 
 	std::shared_ptr<const std::string> filename = pattern->second.second;
 
+	size_t optional_error_count = optional_errors.size();
+
 	return std::visit(overload(
 		[&](std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>> r)->std::variant<const TypeInfo*, std::vector<TypeError>>{
 			current_class_parameters = move(old_parameters);
 			for(TypeError& oe : r.second) {
 				oe.fill_filename_if_empty(filename);
-				oe.add_context(context);
 				optional_errors.push_back(std::move(oe));
+			}
+			for(size_t i = optional_error_count; i < optional_errors.size(); ++i) {
+				optional_errors[i].add_context(context);
 			}
 			RealClassInfo* ci = r.first.get();
 			if(!ci->has_unknown_parameters()) {

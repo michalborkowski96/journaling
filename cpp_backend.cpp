@@ -99,14 +99,9 @@ public:
 	}
 
 	void print_owned_type(const VariableType& type, const std::map<std::string, const TypeInfo*>& parameters) {
-		std::visit(overload([&](const IntType&){
-			print_data(u8"🍆::Integer");
-		},
-		[&](const PointerType& type){
-			print_data(u8"🍆::StrongObject<");
-			print_type(type, parameters);
-			print_data('>');
-		}), type);
+		print_data(u8"🍆::StrongObject<");
+		print_type(type, parameters);
+		print_data('>');
 	}
 
 	void print_function_arguments(const std::vector<std::pair<VariableType, Identifier>>& args, const std::map<std::string, const TypeInfo*>& parameters) {
@@ -150,10 +145,10 @@ public:
 					print_data("\\x", hex_chars[(c & 0xF0) >> 4], hex_chars[c & 0x0F]);
 				}
 			}
-			print_data('"');
+			print_data("\", ", e->value.size(), ')');
 		},
 		[&](const std::unique_ptr<IntegerLiteral>& i){
-			print_data(i->value, "LL");
+			print_data(u8"🍆::make_object<🍆::Integer>(", i->value, "LL)");
 		},
 		[&](const std::unique_ptr<Identifier>& e){
 			print_data("var_", *e);
@@ -492,7 +487,7 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 		for(const ClassVariable& var : ast_data.variables) {
 			std::visit(overload(
 			[&](const ClassVariableInteger& i) {
-				output.print_line(u8"🍆::Integer var_", i.name, ';');
+				output.print_line(u8"🍆::StrongObject<🍆::Integer> var_", i.name, ';');
 			},
 			[&](const ClassVariablePointer& p) {
 				output.print_indentation();
