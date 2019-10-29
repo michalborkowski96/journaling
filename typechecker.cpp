@@ -1657,4 +1657,6 @@ std::pair<std::pair<std::vector<TypeError>, std::vector<TypeError>>, ClassDataba
 	return std::make_pair(std::make_pair(std::move(errors), class_database.get_optional_errors()), std::move(class_database));
 }
 
+RealFunctionInfoView::RealFunctionInfoView(const RealFunctionInfo& f) : name(f.name), return_type(f.return_type), type_info_data(f.type_info_data.get()), arguments(f.arguments), declaration_ast(f.declaration_ast), body_ast(f.body_ast), dual(f.dual) {}
+
 }

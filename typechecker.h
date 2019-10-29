@@ -157,6 +157,19 @@ public:
 	virtual std::string full_name() const override;
 	std::optional<std::vector<TypeError>> check_body(VariableMap& variable_map, ClassDatabase& class_database) const;
 	virtual ~RealFunctionInfo() = default;
+	friend class RealFunctionInfoView;
+};
+
+struct RealFunctionInfoView {
+	const std::string& name;
+	const TypeInfo* const return_type;
+	const TypeInfo* const type_info_data;
+	const std::vector<const TypeInfo*>& arguments;
+	const ast::Function* const declaration_ast;
+	const std::optional<const ast::Function*>& body_ast;
+	const std::optional<std::pair<const std::pair<std::vector<std::pair<ast::VariableType, ast::Identifier>>, std::unique_ptr<ast::statement::Block>>*, std::vector<const TypeInfo*>>>& dual;
+	RealFunctionInfoView() = delete;
+	RealFunctionInfoView(const RealFunctionInfo&);
 };
 
 class RealClassInfo : public TypeInfo {

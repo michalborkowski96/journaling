@@ -40,7 +40,7 @@ public:
 			if(!view.parameters.empty()) {
 				print_data('<');
 				print_type(view.parameters[0]);
-				for(size_t i = 0; i < view.parameters.size(); ++i) {
+				for(size_t i = 1; i < view.parameters.size(); ++i) {
 					print_data(", ");
 					print_type(view.parameters[i]);
 				}
@@ -68,7 +68,7 @@ public:
 		if(!t.parameters.empty()) {
 			o << '<';
 			print_type(t.parameters[0], parameters);
-			for(size_t i = 0; i < t.parameters.size(); ++i) {
+			for(size_t i = 1; i < t.parameters.size(); ++i) {
 				o << ", ";
 				print_type(t.parameters[i], parameters);
 			}
@@ -87,7 +87,7 @@ public:
 		), t);
 	}
 
-	void print_type(const Type& t, const std::map<std::string, const TypeInfo*>& parameters) {
+	/*void print_type(const Type& t, const std::map<std::string, const TypeInfo*>& parameters) {
 		return std::visit(overload(
 		[&](const VoidType&){
 			o << "void";
@@ -96,11 +96,21 @@ public:
 			print_type(vt, parameters);
 		}
 		), t);
-	}
+	}NIE UŻYWAĆ, BO BĘDZIE STRONG_OBJECT<VOID>*/
 
 	void print_owned_type(const VariableType& type, const std::map<std::string, const TypeInfo*>& parameters) {
 		print_data(u8"🍆::StrongObject<");
 		print_type(type, parameters);
+		print_data('>');
+	}
+
+	void print_owned_type(const TypeInfo* type) {
+		if(dynamic_cast<const VoidTypeInfo*>(type)) {
+			print_data("void");
+			return;
+		}
+		print_data(u8"🍆::StrongObject<");
+		print_type(type);
 		print_data('>');
 	}
 
@@ -137,7 +147,7 @@ public:
 		print_data("(");
 		std::visit(overload(
 		[&](const std::unique_ptr<StringLiteral>& e){
-			print_data(u8"🍆::make_string(\"");
+			print_data(u8"🍆::StrongObject<Type_String>::make_object((long long) \"");
 			for(char c : e->value) {
 				if((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
 					print_data(c);
@@ -145,7 +155,7 @@ public:
 					print_data("\\x", hex_chars[(c & 0xF0) >> 4], hex_chars[c & 0x0F]);
 				}
 			}
-			print_data("\", ", e->value.size(), ')');
+			print_data("\", ", e->value.size(), "LL)");
 		},
 		[&](const std::unique_ptr<IntegerLiteral>& i){
 			print_data(u8"🍆::make_object<🍆::Integer>(", i->value, "LL)");
@@ -373,7 +383,7 @@ public:
 		[&](const std::unique_ptr<Return>& s) {
 			print_data("return");
 			if(!s->values.empty()) {
-				print_data(u8" 🍆::make_return_value(");
+				print_data(" std::make_tuple(");
 				print_expression(s->values[0], parameters);
 				for(size_t i = 1; i < s->values.size(); ++i) {
 					print_data(", ");
@@ -446,7 +456,7 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 				if(!ast_data.parameters.empty()) {
 					output.print_indentation();
 					output.print_data("template <typename");
-					for(size_t i = 0; i < ast_data.parameters.size(); ++i) {
+					for(size_t i = 1; i < ast_data.parameters.size(); ++i) {
 						output.print_data(", typename");
 					}
 					output.print_data('>');
@@ -551,49 +561,62 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 			output.print_line("Type_", ast_data.name, "(Type_", ast_data.name,"&&) = delete;");
 			output.print_line();
 		}
-/*
+
 		{
-			for(const Function& f : c.functions) {
-				if(f.dual) {
-					header.print_indentation();
-					header.print_data("virtual void dualfun_", f.name);
-					header.print_function_arguments(f.dual->first);
-					header.print_data(' ');
-					header.print_block(*f.dual->second);
-				}
+			for(const auto& [name, f_] : c.functions) {
+				RealFunctionInfoView f(*f_);
 
-				if(f.body) {
-					header.print_indentation();
-					header.print_data("auto basefun_", f.name);
-					header.print_function_arguments(f.arguments);
-					header.print_data(' ');
-					header.print_block(**f.body);
-					header.print_endline();
-				}
+				if (f.body_ast && (*f.body_ast) == f.declaration_ast) {
+					output.print_indentation();
+					output.print_data("auto basefun_", f.name);
+					output.print_function_arguments(f.declaration_ast->arguments, parameters);
+					output.print_data(' ');
+					output.print_block(**(*f.body_ast)->body, parameters);
+					output.print_endline();
 
-				header.print_indentation();
-				header.print_data("virtual ");
-				std::visit(overload([&](const VoidType&){
-					header.print_data("void");
-				}, [&](const VariableType& t) {
-					header.print_owned_type(t, parameters);
-				}), f.return_type);
-				header.print_data(" privfun_", f.name);
-				header.print_function_arguments(f.arguments);
-				header.print_data(" {");
-				header.print_endline();
-				header.print_indentation();
-				header.print_data(u8"return 🍆::get_return_value<", f.return_type, ">(basefun_", f.name, '(');
-				if(!f.arguments.empty()) {
-					header.print_data(f.arguments[0].second);
-					for(size_t i = 1; i < f.arguments.size(); ++i) {
-						header.print_data(", ", f.arguments[1].second);
+					output.print_indentation();
+					output.print_data("virtual ");
+					output.print_owned_type(f.return_type);
+					output.print_data(" privfun_", f.name);
+					output.print_function_arguments(f.declaration_ast->arguments, parameters);
+					output.print_data(" {");
+					output.print_endline();
+					output.add_level();
+					output.print_indentation();
+					if(!dynamic_cast<const VoidTypeInfo*>(f.return_type)) {
+						output.print_data("return std::get<0>(");
+					} else {
+						output.print_data('(');
 					}
+					output.print_data("basefun_", f.name, '(');
+					if(!f.arguments.empty()) {
+						output.print_data("var_", f.declaration_ast->arguments[0].second);
+						for(size_t i = 1; i < f.arguments.size(); ++i) {
+							output.print_data(", var_", f.declaration_ast->arguments[i].second);
+						}
+					}
+					output.print_data("));");
+					output.print_endline();
+					output.remove_level();
+					output.print_line('}');
+				} else if (!f.body_ast) {
+					output.print_indentation();
+					output.print_data("virtual ");
+					output.print_owned_type(f.return_type);
+					output.print_data(" privfun_", f.name);
+					output.print_function_arguments(f.declaration_ast->arguments, parameters);
+					output.print_data(" = 0;");
+					output.print_endline();
 				}
-				header.print_data("));");
-				header.print_endline();
-				header.print_line('}');
 
+				if(f.dual && f.declaration_ast->dual && f.dual->first == &*f.declaration_ast->dual) {
+					output.print_indentation();
+					output.print_data("virtual void dualfun_", f.name);
+					output.print_function_arguments(f.declaration_ast->dual->first, parameters);
+					output.print_data(' ');
+					output.print_block(*f.declaration_ast->dual->second, parameters);
+				}
+/*
 				header.print_indentation();
 				header.print_data("virtual ");
 				std::visit(overload([&](const VoidType&){
@@ -618,10 +641,9 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 				header.print_line(u8"return 🍆::get_return_value<", f.return_type, ">(result);");
 				header.print_line('}');
 
-				header.print_line();
+				header.print_line();*/
 			}
 		}
-		*/
 
 		output.remove_level();
 		output.print_line("};");
@@ -635,7 +657,7 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 			output.print_indentation();
 			output.print_data("struct 🍆::has_journal<");
 			output.print_type(c_);
-			output.print_data("> : public 🍆::", ast_data.nojournal ? "false" : "true", "_type {};");
+			output.print_data("> : public std::", ast_data.nojournal ? "false" : "true", "_type {};");
 			output.print_endline();
 			output.print_line();
 		}
