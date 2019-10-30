@@ -519,10 +519,13 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 		{
 			if(ast_data.destructor) {
 				output.print_indentation();
-				output.print_data("~Type_", ast_data.name, "() ");
+				output.print_data("virtual ~Type_", ast_data.name, "() ");
 				output.print_block(*ast_data.destructor->body, parameters);
-				output.print_line();
+				output.print_endline();
+			} else {
+				output.print_line("virtual ~Type_", ast_data.name, "() = default;");
 			}
+			output.print_line();
 		}
 
 		{
@@ -609,12 +612,12 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 					output.print_endline();
 				}
 
-				if(f.dual && f.declaration_ast->dual && f.dual->first == &*f.declaration_ast->dual) {
+				if(f.dual) {
 					output.print_indentation();
-					output.print_data("virtual void dualfun_", f.name);
-					output.print_function_arguments(f.declaration_ast->dual->first, parameters);
+					output.print_data("void dualfun_", f.name);
+					output.print_function_arguments(f.dual->first->first, parameters);
 					output.print_data(' ');
-					output.print_block(*f.declaration_ast->dual->second, parameters);
+					output.print_block(*f.dual->first->second, parameters);
 				}
 /*
 				header.print_indentation();
