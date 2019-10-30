@@ -158,7 +158,7 @@ public:
 			print_data("\", ", e->value.size(), "LL)");
 		},
 		[&](const std::unique_ptr<IntegerLiteral>& i){
-			print_data(u8"🍆::make_object<🍆::Integer>(", i->value, "LL)");
+			print_data(u8"🍆::StrongObject<🍆::Integer>(", i->value, "LL)");
 		},
 		[&](const std::unique_ptr<Identifier>& e){
 			print_data("var_", *e);
@@ -494,6 +494,9 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 		output.print_data(" {");
 		output.print_endline();
 		output.add_level();
+		if(!ast_data.nojournal) {
+			output.print_line(u8"🍆::Journal journal;");
+		}
 		for(const ClassVariable& var : ast_data.variables) {
 			std::visit(overload(
 			[&](const ClassVariableInteger& i) {
@@ -513,8 +516,15 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 			output.print_line("public:");
 			output.add_level();
 		}
-
-		output.print_line(u8"🍆::WeakObject<Type_" , ast_data.name, "> _this;");
+		if(!ast_data.superclass) {
+			output.print_line(u8"🍆::WeakObject<Type_" , ast_data.name, "> _this;");
+		} else {
+			output.print_indentation();
+			output.print_data("using ");
+			output.print_type(*ast_data.superclass, parameters);
+			output.print_data("::_this;");
+			output.print_endline();
+		}
 
 		{
 			if(ast_data.destructor) {
@@ -536,21 +546,32 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 				}
 				output.print_indentation();
 				output.print_data("Type_", ast_data.name);
-				output.print_function_arguments(constructor.arguments, parameters);
+
+
+				output.print_data("(WeakObject<");
+				output.print_type(c_);
+				output.print_data("> _this");
+				for(size_t i = 0; i < constructor.arguments.size(); ++i) {
+					output.print_data(", ");
+					output.print_owned_type(constructor.arguments[i].first, parameters);
+					output.print_data(" var_", constructor.arguments[i].second);
+				}
+				output.print_data(")");
 
 				output.print_data(' ');
 				if(constructor.superclass_call) {
 					output.print_data(": ");
 					output.print_type(*ast_data.superclass, parameters);
-					output.print_data("(");
+					output.print_data("(_this");
 					if(!constructor.superclass_call->empty()) {
-						output.print_expression((*constructor.superclass_call)[0], parameters);
-						for(size_t i = 1; i < constructor.superclass_call->size(); ++i) {
+						for(size_t i = 0; i < constructor.superclass_call->size(); ++i) {
 							output.print_data(", ");
 							output.print_expression((*constructor.superclass_call)[i], parameters);
 						}
 					}
 					output.print_data(") ");
+				} else {
+					output.print_data(": _this(_this) ");
 				}
 				output.print_block(*constructor.body, parameters);
 				output.print_line();
@@ -602,6 +623,73 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 					output.print_endline();
 					output.remove_level();
 					output.print_line('}');
+
+					if(f.dual) {
+						output.print_indentation();
+						output.print_data("void dualfun_", f.name);
+						output.print_function_arguments(f.dual->first->first, parameters);
+						output.print_data(' ');
+						output.print_block(*f.dual->first->second, parameters);
+					}
+
+					output.print_indentation();
+					output.print_data("virtual ");
+					output.print_owned_type(f.return_type);
+					output.print_data(" fun_", f.name);
+					output.print_function_arguments(f.declaration_ast->arguments, parameters);
+					output.print_data(" {");
+					output.print_endline();
+					output.add_level();
+
+					const char* kind = nullptr;
+					if(f.declaration_ast->kind) {
+						switch(*f.declaration_ast->kind) {
+						case FunctionKind::DUAL:
+							kind = "dual";
+							break;
+						case FunctionKind::IRREVERSIBLE:
+							kind = "irreversible";
+							break;
+						case FunctionKind::NOEFFECT:
+							break;
+						}
+					}
+
+					if(kind) {
+						output.print_line("journal.start_", kind, "(this);");
+					}
+					output.print_indentation();
+					if(!(dynamic_cast<const VoidTypeInfo*>(f.return_type) && ((!f.declaration_ast->kind) || (!f.dual) || (f.dual->first->first.empty())))) {
+						output.print_data("auto result = ");
+					}
+					output.print_data("basefun_", f.name, '(');
+					if(!f.arguments.empty()) {
+						output.print_data("var_", f.declaration_ast->arguments[0].second);
+						for(size_t i = 1; i < f.arguments.size(); ++i) {
+							output.print_data(", var_", f.declaration_ast->arguments[i].second);
+						}
+					}
+					output.print_data(");");
+					output.print_endline();
+					if(kind) {
+						if(*f.declaration_ast->kind == FunctionKind::IRREVERSIBLE) {
+							output.print_line("journal.end_irreversible(this);");
+						} else if (*f.declaration_ast->kind == FunctionKind::DUAL) {
+							if(dynamic_cast<const VoidTypeInfo*>(f.return_type)) {
+								output.print_line("journal.end_dual(this, dualfun_", f.name, ", std::make_tuple());");
+							} else {
+								output.print_line("journal.end_dual(this, dualfun_", f.name, u8", 🍆::pop_tuple(result));");
+							}
+						} else {
+							throw std::runtime_error("Internal error.");
+						}
+					}
+					if(!dynamic_cast<const VoidTypeInfo*>(f.return_type)) {
+						output.print_line("return std::get<0>(result);");
+					}
+					output.remove_level();
+					output.print_line('}');
+					output.print_line();
 				} else if (!f.body_ast) {
 					output.print_indentation();
 					output.print_data("virtual ");
@@ -611,40 +699,6 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 					output.print_data(" = 0;");
 					output.print_endline();
 				}
-
-				if(f.dual) {
-					output.print_indentation();
-					output.print_data("void dualfun_", f.name);
-					output.print_function_arguments(f.dual->first->first, parameters);
-					output.print_data(' ');
-					output.print_block(*f.dual->first->second, parameters);
-				}
-/*
-				header.print_indentation();
-				header.print_data("virtual ");
-				std::visit(overload([&](const VoidType&){
-					header.print_data("void");
-				}, [&](const VariableType& t) {
-					header.print_owned_type(t, parameters);
-				}), f.return_type);
-				header.print_data(" fun_", f.name);
-				header.print_function_arguments(f.arguments);
-				header.print_data(" {");
-				header.print_endline();
-				header.print_indentation();
-				header.print_data(u8"auto result = basefun_", f.name, '(');
-				if(!f.arguments.empty()) {
-					header.print_data(f.arguments[0].second);
-					for(size_t i = 1; i < f.arguments.size(); ++i) {
-						header.print_data(", ", f.arguments[1].second);
-					}
-				}
-				header.print_data(");");
-				header.print_endline();
-				header.print_line(u8"return 🍆::get_return_value<", f.return_type, ">(result);");
-				header.print_line('}');
-
-				header.print_line();*/
 			}
 		}
 
