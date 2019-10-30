@@ -476,12 +476,14 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 			parameters.emplace(ast_data.parameters[i].name, c.parameters[i]);
 		}
 
+		output.print_line(u8"#ifndef 🍆", ast_data.name);
+
 		if(!c.parameters.empty()) {
 			output.print_line("template <>");
 		} else {
-			output.print_line(u8"#ifndef 🍆", ast_data.name);
 			output.print_line(u8"#define 🍆", ast_data.name);
 		}
+
 		output.print_indentation();
 		output.print_data(ast_data.public_variables ? "struct " : "class ");
 
@@ -704,9 +706,7 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 
 		output.remove_level();
 		output.print_line("};");
-		if(c.parameters.empty()) {
-			output.print_line("#endif");
-		}
+		output.print_line("#endif");
 		output.print_line();
 
 		{
