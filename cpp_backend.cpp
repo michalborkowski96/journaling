@@ -665,27 +665,40 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 					}
 
 					output.print_indentation();
-					output.print_data("return journal.add_commit_", dual ? (dynamic_cast<const VoidTypeInfo*>(f.return_type) ? "dual_void" : "dual_return") : "noeffect", "(");
-					/*if(!(dynamic_cast<const VoidTypeInfo*>(f.return_type) && ((!f.declaration_ast->kind) || (!f.dual) || (f.dual->first->first.empty())))) {
-						output.print_data("auto result = ");
-					}*/
-					output.print_data(u8"[this_ptr{this_ptr}");
-					for(size_t i = 0; i < f.arguments.size(); ++i) {
-						output.print_data(", var_", f.declaration_ast->arguments[i].second);
-					}
-					output.print_data("]() mutable {");
-					output.print_data("return this_ptr->basefun_", f.name, '(');
-					if(!f.arguments.empty()) {
-						output.print_data("var_", f.declaration_ast->arguments[0].second);
-						for(size_t i = 1; i < f.arguments.size(); ++i) {
+					if(ast_data.nojournal) {
+						if(!dynamic_cast<const VoidTypeInfo*>(f.return_type)) {
+							output.print_data("return std::get<0>(");
+						} else {
+							output.print_data('(');
+						}
+						output.print_data("basefun_", f.name, '(');
+						if(!f.arguments.empty()) {
+							output.print_data("var_", f.declaration_ast->arguments[0].second);
+							for(size_t i = 1; i < f.arguments.size(); ++i) {
+								output.print_data(", var_", f.declaration_ast->arguments[i].second);
+							}
+						}
+						output.print_data("));");
+					} else {
+						output.print_data("return journal.add_commit_", dual ? (dynamic_cast<const VoidTypeInfo*>(f.return_type) ? "dual_void" : "dual_return") : "noeffect", "(");
+						output.print_data(u8"[this_ptr{this_ptr}");
+						for(size_t i = 0; i < f.arguments.size(); ++i) {
 							output.print_data(", var_", f.declaration_ast->arguments[i].second);
 						}
+						output.print_data("]() mutable {");
+						output.print_data("return this_ptr->basefun_", f.name, '(');
+						if(!f.arguments.empty()) {
+							output.print_data("var_", f.declaration_ast->arguments[0].second);
+							for(size_t i = 1; i < f.arguments.size(); ++i) {
+								output.print_data(", var_", f.declaration_ast->arguments[i].second);
+							}
+						}
+						output.print_data(");}");
+						if(dual) {
+							output.print_data(", &dualfun_", f.name);
+						}
+						output.print_data(");");
 					}
-					output.print_data(");}");
-					if(dual) {
-						output.print_data(", &dualfun_", f.name);
-					}
-					output.print_data(");");
 					output.print_endline();
 					output.remove_level();
 					output.print_line('}');
