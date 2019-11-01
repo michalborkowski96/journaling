@@ -196,7 +196,7 @@ public:
 			print_data(u8"🍆::null");
 		},
 		[&](const std::unique_ptr<This>&){
-			print_data("_this");
+			print_data("this_ptr");
 		},
 		[&](const std::unique_ptr<MemberAccess>& e){
 			print_expression(e->object, parameters);
@@ -207,10 +207,10 @@ public:
 				print_data(u8"🍆::lazy_call([");
 
 				std::visit(overload([&](const std::unique_ptr<Identifier>&) {
-					print_data(u8"_this{🍆::capture(_this)}");
+					print_data(u8"this_ptr{🍆::capture(this_ptr)}");
 				},
 				[&](const std::unique_ptr<MemberAccess>& ee) {
-					print_data(u8"_this{🍆::capture");
+					print_data(u8"this_ptr{🍆::capture");
 					print_expression(ee->object, parameters);
 					print_data("}");
 				},
@@ -225,7 +225,7 @@ public:
 					print_data("}");
 				}
 
-				print_data("](){return _this->");
+				print_data("]() mutable {return this_ptr->");
 				std::visit(overload([&](const std::unique_ptr<Identifier>& ee) {
 					print_data("privfun_", *ee);
 				},
@@ -525,12 +525,12 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 			output.add_level();
 		}
 		if(!ast_data.superclass) {
-			output.print_line(u8"🍆::WeakObject<Type_" , ast_data.name, "> _this;");
+			output.print_line(u8"🍆::WeakObject<Type_" , ast_data.name, "> this_ptr;");
 		} else {
 			output.print_indentation();
 			output.print_data("using ");
 			output.print_type(*ast_data.superclass, parameters);
-			output.print_data("::_this;");
+			output.print_data("::this_ptr;");
 			output.print_endline();
 		}
 
@@ -558,7 +558,7 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 
 				output.print_data("(WeakObject<");
 				output.print_type(c_);
-				output.print_data("> _this");
+				output.print_data("> this_ptr");
 				for(size_t i = 0; i < constructor.arguments.size(); ++i) {
 					output.print_data(", ");
 					output.print_owned_type(constructor.arguments[i].first, parameters);
@@ -570,7 +570,7 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 				if(constructor.superclass_call) {
 					output.print_data(": ");
 					output.print_type(*ast_data.superclass, parameters);
-					output.print_data("(_this");
+					output.print_data("(this_ptr");
 					if(!constructor.superclass_call->empty()) {
 						for(size_t i = 0; i < constructor.superclass_call->size(); ++i) {
 							output.print_data(", ");
@@ -579,7 +579,7 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 					}
 					output.print_data(") ");
 				} else {
-					output.print_data(": _this(_this) ");
+					output.print_data(": this_ptr(this_ptr) ");
 				}
 				output.print_block(*constructor.body, parameters);
 				output.print_line();
@@ -669,12 +669,12 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 					/*if(!(dynamic_cast<const VoidTypeInfo*>(f.return_type) && ((!f.declaration_ast->kind) || (!f.dual) || (f.dual->first->first.empty())))) {
 						output.print_data("auto result = ");
 					}*/
-					output.print_data(u8"[_this");
+					output.print_data(u8"[this_ptr{this_ptr}");
 					for(size_t i = 0; i < f.arguments.size(); ++i) {
 						output.print_data(", var_", f.declaration_ast->arguments[i].second);
 					}
-					output.print_data("](){");
-					output.print_data("return basefun_", f.name, '(');
+					output.print_data("]() mutable {");
+					output.print_data("return this_ptr->basefun_", f.name, '(');
 					if(!f.arguments.empty()) {
 						output.print_data("var_", f.declaration_ast->arguments[0].second);
 						for(size_t i = 1; i < f.arguments.size(); ++i) {
