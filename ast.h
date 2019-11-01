@@ -60,9 +60,9 @@ namespace ast {
 
 		struct FunctionCall;
 
-		struct LazyFunctionCall;
-
 		struct Cast;
+
+		struct Snapshot;
 
 		struct Null;
 
@@ -74,7 +74,7 @@ namespace ast {
 
 		struct New;
 
-		using Expression = Wrap<std::variant, std::unique_ptr, StringLiteral, IntegerLiteral, Identifier, New, Negation, Cast, Null, This, MemberAccess, FunctionCall, LazyFunctionCall, BinaryOperation>;
+		using Expression = Wrap<std::variant, std::unique_ptr, StringLiteral, IntegerLiteral, Identifier, New, Negation, Cast, Snapshot, Null, This, MemberAccess, FunctionCall, BinaryOperation>;
 
 		struct StringLiteral : public AstNode {
 			std::string value;
@@ -108,20 +108,20 @@ namespace ast {
 
 		struct FunctionCall : public AstNode {
 			Expression function;
-			std::vector<Expression> arguments;
-			FunctionCall(size_t begin, size_t end, Expression function, std::vector<Expression>&& arguments);
-		};
-
-		struct LazyFunctionCall : public AstNode {
-			Expression function;
 			std::vector<std::pair<Expression, bool>> arguments;
-			LazyFunctionCall(size_t begin, size_t end, Expression function, std::vector<std::pair<Expression, bool>>&& arguments);
+			bool lazy;
+			FunctionCall(size_t begin, size_t end, Expression function, std::vector<std::pair<Expression, bool>>&& arguments, bool lazy);
 		};
 
 		struct Cast : public AstNode {
 			PointerType target_type;
 			Expression value;
 			Cast(size_t begin, size_t end, PointerType&& target_type, Expression value);
+		};
+
+		struct Snapshot : public AstNode {
+			Expression value;
+			Snapshot(size_t begin, size_t end, Expression value);
 		};
 
 		struct Negation : public AstNode {
@@ -240,7 +240,7 @@ namespace ast {
 	}
 
 	enum class FunctionKind {
-		DUAL, NOEFFECT, IRREVERSIBLE
+		DUAL, NOEFFECT
 	};
 
 	struct Constructor : public AstNode {

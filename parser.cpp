@@ -96,17 +96,17 @@ namespace {
 			return args;
 		}
 
-		std::vector<std::pair<Expression, bool>> parse_lazy_call_arguments() {
-			check_for_tokens(LexemeType::SQUARE_OPEN);
+		std::vector<std::pair<Expression, bool>> parse_lazy_call_arguments(bool expect_round_bracket = false) {
+			check_for_tokens(expect_round_bracket ? LexemeType::BRACKET_OPEN : LexemeType::SQUARE_OPEN);
 			++pos;
 			std::vector<std::pair<Expression, bool>> args;
-			while(tokens[pos].type != LexemeType::SQUARE_CLOSE) {
+			while(tokens[pos].type != (expect_round_bracket ? LexemeType::BRACKET_CLOSE : LexemeType::SQUARE_CLOSE)) {
 				bool marked = tokens[pos].type == LexemeType::COLON;
 				if(marked) {
 					++pos;
 				}
 				args.push_back(make_pair(parse_expression(), marked));
-				if(tokens[pos].type == LexemeType::COMMA && tokens[pos + 1].type != LexemeType::SQUARE_CLOSE) {
+				if(tokens[pos].type == LexemeType::COMMA && tokens[pos + 1].type != (expect_round_bracket ? LexemeType::BRACKET_CLOSE : LexemeType::SQUARE_CLOSE)) {
 					++pos;
 				}
 			}
@@ -186,6 +186,12 @@ namespace {
 				Expression expr = parse_ll_expression();
 				expression = std::make_unique<Cast>(begin, tokens[pos - 1].end, std::move(type), std::move(expr));
 			},
+			LexemeType::SNAPSHOT, [&]() {
+				++pos;
+				check_for_tokens(LexemeType::BRACKET_OPEN);
+				Expression expr = parse_ll_expression();
+				expression = std::make_unique<Snapshot>(begin, tokens[pos - 1].end, std::move(expr));
+			},
 			LexemeType::NIL, [&]() {
 				++pos;
 				expression = std::make_unique<Null>(begin, tokens[pos - 1].end);
@@ -202,12 +208,12 @@ namespace {
 			while(
 				expect(
 				LexemeType::BRACKET_OPEN, [&](){
-					std::vector<Expression> args = parse_call_arguments();
-					expression = std::make_unique<FunctionCall>(begin, tokens[pos - 1].end, std::move(*expression), move(args));
+					std::vector<std::pair<Expression, bool>> args = parse_lazy_call_arguments(true);
+					expression = std::make_unique<FunctionCall>(begin, tokens[pos - 1].end, std::move(*expression), move(args), false);
 				},
 				LexemeType::SQUARE_OPEN, [&](){
 					std::vector<std::pair<Expression, bool>> args = parse_lazy_call_arguments();
-					expression = std::make_unique<LazyFunctionCall>(begin, tokens[pos - 1].end, std::move(*expression), move(args));
+					expression = std::make_unique<FunctionCall>(begin, tokens[pos - 1].end, std::move(*expression), move(args), true);
 				},
 				LexemeType::DOT, [&](){
 					++pos;
@@ -519,8 +525,7 @@ namespace {
 			std::optional<FunctionKind> kind;
 			std::optional<std::pair<std::vector<std::pair<VariableType, Identifier>>, std::unique_ptr<Block>>> dual;
 
-			expect(LexemeType::IRREVERSIBLE, [&](){kind = FunctionKind::IRREVERSIBLE; ++pos;},
-				LexemeType::NOEFFECT, [&](){kind = FunctionKind::NOEFFECT; ++pos;},
+			expect(LexemeType::NOEFFECT, [&](){kind = FunctionKind::NOEFFECT; ++pos;},
 				LexemeType::DUAL, [&](){
 					kind = FunctionKind::DUAL;
 					++pos;

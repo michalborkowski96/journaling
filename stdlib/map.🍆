@@ -32,19 +32,16 @@ Map K V : Container<Pair<K, V>, AVLNode_<Pair<K, V>>> {
 	fun AVLNode_<Pair<K, V>> end() {
 		return data.end();
 	} noeffect;
-	fun void clear() {
-		data.clear();
-	} irreversible;
 	fun AVLNode_<Pair<K, V>> find(K key) {
-		return data.find(new Pair<K, V>(key, null));
+		return data.find(:new Pair<K, V>(key, null));
 	} noeffect;
 
 	fun Pair<Integer, Pair<K, V>> insert_kv(K key, V value) {
-		return this.insert(new Pair<K, V>(key, value));
+		return this.insert(:new Pair<K, V>(key, value));
 	} dual (){};
 
 	fun Pair<Integer, Pair<K, V>> insert(Pair<K, V> entry) {
-		var Pair<Integer, Pair<K, V>> old = data.insert(entry);
+		var Pair<Integer, Pair<K, V>> old = data.insert(:entry);
 		if(old.first.to_int()) {
 			return old, old.second, true;
 		} else {
@@ -59,7 +56,7 @@ Map K V : Container<Pair<K, V>, AVLNode_<Pair<K, V>>> {
 	};
 
 	fun Pair<Integer, V> erase(K key) {
-		var Pair<Integer, Pair<K, V>> old = data.erase(new Pair<K, V>(key, null));
+		var Pair<Integer, Pair<K, V>> old = data.erase(:new Pair<K, V>(key, null));
 		var V v;
 		if(old.second != null) {
 			v = old.second.second;

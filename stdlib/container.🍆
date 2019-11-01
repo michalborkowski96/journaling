@@ -106,19 +106,19 @@ abstract OrderedContainer Element Iterator : Container<Element, Iterator> {
 	};
 
 	fun void push_back(Element e) {
-		this.insert(end(), e);
+		this.insert(:end(), e);
 	} dual (){};
 
 	fun void pop_back() {
-		this.erase(end().prev());
+		this.erase(:end().prev());
 	} dual (){};
 
 	fun void push_front(Element e) {
-		this.insert(begin(), e);
+		this.insert(:begin(), e);
 	} dual (){};
 
 	fun void pop_front() {
-		this.erase(begin());
+		this.erase(:begin());
 	} dual (){};
 
 	fun void resize(int new_size, Element el) {
@@ -134,11 +134,16 @@ abstract OrderedContainer Element Iterator : Container<Element, Iterator> {
 		for(var Iterator e1 = begin(); !e1.eq(end()); e1 = e1.next()) {
 			for(var Iterator e2 = e1.next(); !e2.eq(end()); e2 = e2.next()) {
 				if(comp.less(e2.deref(), e1.deref())) {
-					var Element e = e1.deref();
-					e1.set(e2.deref());
-					e2.set(e);
+					var Element e1_elem = e1.deref();
+					var Element e2_elem = e2.deref();
+					var Iterator e1_next = e1.next();
+					var Iterator e2_next = e2.next();
+					this.erase(:e1);
+					this.erase(:e2);
+					e1 = this.insert(:e1_next, e2_elem);
+					e2 = this.insert(:e2_next, e1_elem);
 				}
 			}
 		}
-	} irreversible;
+	} dual(){};
 }

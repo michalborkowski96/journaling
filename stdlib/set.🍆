@@ -23,10 +23,6 @@ Set T : Container<T, AVLNode_<T>> {
 	fun AVLNode_<T> end() {
 		return end_;
 	} noeffect;
-	fun void clear() {
-		size_ = 0;
-		end_.left_son = null;
-	} irreversible;
 	fun AVLNode_<T> find(T key) {
 		if(empty()) {
 			return end_;
@@ -62,7 +58,7 @@ Set T : Container<T, AVLNode_<T>> {
 			z = z.parent;
 		}
 		return z.parent;
-	} irreversible;
+	} noeffect;
 
 	fun Pair<Integer, T> insert(T entry) {
 		var AVLNode_<T> node = end_.left_son;

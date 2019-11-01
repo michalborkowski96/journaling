@@ -23,12 +23,6 @@ List T : OrderedContainer<T, ListElement_<T>> {
 		return size_;
 	} noeffect;
 
-	fun void clear() {
-		size_ = 0;
-		end_ = new ListElement_<T>(null, null, null);
-		begin_ = end_;
-	} irreversible;
-
 	fun ListElement_<T> insert(ListElement_<T> iter, T element) {
 		size_ = size_ + 1;
 		var ListElement_<T> n = new ListElement_<T>(element, iter, iter.prev_);

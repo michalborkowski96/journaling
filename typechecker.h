@@ -41,6 +41,7 @@ class VoidTypeInfo;
 class FunctionalTypeInfo;
 class FunctionInfo;
 class BuiltinIntFunctionInfo;
+class PrivateContextFunctionInfo;
 
 class TypeInfo {
 	friend class RealClassInfo;
@@ -59,6 +60,7 @@ class TypeInfo {
 	TypeInfo(const TypeInfo&) = delete;
 	TypeInfo(TypeInfo&&) = delete;
 public:
+	virtual bool copyable() const;
 	virtual bool extendable() const;
 	virtual std::optional<const TypeInfo*> get_superclass() const;
 	virtual bool constructible_with(const std::vector<const TypeInfo*>&) const;
@@ -71,6 +73,8 @@ public:
 	bool explicitly_convertible_to(const TypeInfo* o) const;
 	bool comparable_with(const TypeInfo* o) const;
 	friend void print(std::ostream&, const std::vector<const RealClassInfo*>&);
+	virtual bool requires_call_nojournal_marks() const;
+	virtual bool forbids_call_nojournal_marks() const;
 };
 
 class FunctionInfo {
@@ -84,6 +88,8 @@ public:
 	virtual std::optional<const TypeInfo*> call_with(const std::vector<const TypeInfo*>& args) const = 0;
 	virtual std::string full_name() const = 0;
 	virtual ~FunctionInfo() = default;
+	virtual bool requires_call_nojournal_marks() const = 0;
+	virtual bool forbids_call_nojournal_marks() const = 0;
 };
 
 class VariableMap {
@@ -146,18 +152,22 @@ class RealFunctionInfo : public FunctionInfo {
 	const ast::Function* declaration_ast;
 	const std::optional<const ast::Function*> body_ast;
 	const std::optional<std::pair<const std::pair<std::vector<std::pair<ast::VariableType, ast::Identifier>>, std::unique_ptr<ast::statement::Block>>*, std::vector<const TypeInfo*>>> dual;
-	RealFunctionInfo(std::string name, const TypeInfo* return_type, std::vector<const TypeInfo*> arguments, const ast::Function* declaration_ast, std::optional<const ast::Function*> body_ast, std::optional<std::pair<const std::pair<std::vector<std::pair<ast::VariableType, ast::Identifier>>, std::unique_ptr<ast::statement::Block>>*, std::vector<const TypeInfo*>>> dual);
+	RealFunctionInfo(std::string name, const TypeInfo* return_type, std::vector<const TypeInfo*> arguments, const ast::Function* declaration_ast, std::optional<const ast::Function*> body_ast, std::optional<std::pair<const std::pair<std::vector<std::pair<ast::VariableType, ast::Identifier>>, std::unique_ptr<ast::statement::Block>>*, std::vector<const TypeInfo*>>> dual, bool nojournal_marks);
 public:
+	bool nojournal_marks;
+
 	RealFunctionInfo() = delete;
 	const TypeInfo* type_info() const override;
-	static std::variant<std::unique_ptr<RealFunctionInfo>, std::vector<TypeError>> make_function_declaration(std::optional<const RealFunctionInfo*> overridden, ClassDatabase& class_database, const ast::Function* ast);
+	static std::variant<std::unique_ptr<RealFunctionInfo>, std::vector<TypeError>> make_function_declaration(std::optional<const RealFunctionInfo*> overridden, ClassDatabase& class_database, const ast::Function* ast, bool comes_from_nojournal);
 	virtual std::optional<ast::FunctionKind> kind() const override;
 	virtual std::optional<const TypeInfo*> call_with(const std::vector<const TypeInfo*>& args) const override;
 	bool fully_defined() const;
 	virtual std::string full_name() const override;
 	std::optional<std::vector<TypeError>> check_body(VariableMap& variable_map, ClassDatabase& class_database) const;
 	virtual ~RealFunctionInfo() = default;
-	friend class RealFunctionInfoView;
+	friend struct RealFunctionInfoView;
+	virtual bool requires_call_nojournal_marks() const override;
+	virtual bool forbids_call_nojournal_marks() const override;
 };
 
 struct RealFunctionInfoView {
@@ -187,6 +197,7 @@ class RealClassInfo : public TypeInfo {
 	virtual bool implicitly_convertible_from(const IntTypeInfo*) const override;
 	virtual bool implicitly_convertible_from(const TemplateUnknownTypeInfo*) const override;
 public:
+	virtual bool copyable() const override;
 	virtual std::optional<const TypeInfo*> get_superclass() const override;
 	virtual ~RealClassInfo() = default;
 	virtual bool constructible_with(const std::vector<const TypeInfo*>& args) const override;
@@ -200,7 +211,7 @@ public:
 	virtual std::string full_name() const override;
 	bool has_unknown_parameters() const;
 	bool comes_from_same_pattern(const RealClassInfo& o) const;
-	friend class RealClassInfoView;
+	friend struct RealClassInfoView;
 };
 
 struct RealClassInfoView {
@@ -238,6 +249,7 @@ class VoidTypeInfo : public TypeInfo {
 	virtual bool implicitly_convertible_from(const TemplateUnknownTypeInfo*) const override;
 	virtual bool implicitly_convertible_from(const VoidTypeInfo*) const override;
 public:
+	virtual bool copyable() const override;
 	virtual bool check_nojournal_mark(bool mark) const override;
 	virtual bool implicitly_convertible_to(const TypeInfo* o) const override;
 	virtual std::string full_name() const override;

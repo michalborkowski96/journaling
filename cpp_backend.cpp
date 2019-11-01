@@ -187,6 +187,11 @@ public:
 			print_expression(e->value, parameters);
 			print_data(")");
 		},
+		[&](const std::unique_ptr<Snapshot>& e){
+			print_data(u8"🍆::snapshot(");
+			print_expression(e->value, parameters);
+			print_data(")");
+		},
 		[&](const std::unique_ptr<Null>&){
 			print_data(u8"🍆::null");
 		},
@@ -198,69 +203,70 @@ public:
 			print_data("->", "var_", e->member);
 		},
 		[&](const std::unique_ptr<FunctionCall>& e){
-			std::visit(overload([&](const std::unique_ptr<Identifier>& ee) {
-				print_data("privfun_", *ee);
-			},
-			[&](const std::unique_ptr<MemberAccess>& ee) {
-				print_expression(ee->object, parameters);
-				print_data("->", "fun_", ee->member);
-			},
-			[&](const auto&) {
-				throw std::runtime_error("Internal error.");
-			}
-			), e->function);
-			print_data("(");
-			if(!e->arguments.empty()) {
-				print_expression(e->arguments[0], parameters);
-				for(size_t i = 1; i < e->arguments.size(); ++i) {
-					print_data(", ");
-					print_expression(e->arguments[i], parameters);
+			if(e->lazy) {
+				print_data(u8"🍆::lazy_call([");
+
+				std::visit(overload([&](const std::unique_ptr<Identifier>&) {
+					print_data(u8"_this{🍆::capture(_this)}");
+				},
+				[&](const std::unique_ptr<MemberAccess>& ee) {
+					print_data(u8"_this{🍆::capture");
+					print_expression(ee->object, parameters);
+					print_data("}");
+				},
+				[&](const auto&) {
+					throw std::runtime_error("Internal error.");
 				}
-			}
-			print_data(")");
-		},
-		[&](const std::unique_ptr<LazyFunctionCall>& e){
-			print_data(u8"🍆::lazy_call([");
+				), e->function);
 
-			std::visit(overload([&](const std::unique_ptr<Identifier>&) {
-				print_data(u8"_this{🍆::capture(_this)}");
-			},
-			[&](const std::unique_ptr<MemberAccess>& ee) {
-				print_data(u8"_this{🍆::capture");
-				print_expression(ee->object, parameters);
-				print_data("}");
-			},
-			[&](const auto&) {
-				throw std::runtime_error("Internal error.");
-			}
-			), e->function);
-
-			for(size_t i = 0; i < e->arguments.size(); ++i) {
-				print_data(", _arg", i, u8"{🍆::capture");
-				print_expression(e->arguments[i].first, parameters);
-				print_data("}");
-			}
-
-			print_data("](){return _this->");
-			std::visit(overload([&](const std::unique_ptr<Identifier>& ee) {
-				print_data("privfun_", *ee);
-			},
-			[&](const std::unique_ptr<MemberAccess>& ee) {
-				print_data("fun_", ee->member);
-			},
-			[&](const auto&) {
-				throw std::runtime_error("Internal error.");
-			}
-			), e->function);
-
-			print_data('(');
-			if(!e->arguments.empty()) {
-				print_data("_arg0");
-				for(size_t i = 1; i < e->arguments.size(); ++i) {
-					print_data(", _arg", i);
+				for(size_t i = 0; i < e->arguments.size(); ++i) {
+					print_data(", _arg", i, u8"{🍆::capture");
+					print_expression(e->arguments[i].first, parameters);
+					print_data("}");
 				}
+
+				print_data("](){return _this->");
+				std::visit(overload([&](const std::unique_ptr<Identifier>& ee) {
+					print_data("privfun_", *ee);
+				},
+				[&](const std::unique_ptr<MemberAccess>& ee) {
+					print_data("fun_", ee->member);
+				},
+				[&](const auto&) {
+					throw std::runtime_error("Internal error.");
+				}
+				), e->function);
+
+				print_data('(');
+				if(!e->arguments.empty()) {
+					print_data("_arg0");
+					for(size_t i = 1; i < e->arguments.size(); ++i) {
+						print_data(", _arg", i);
+					}
+				}
+				print_data(");}");
+			} else {
+				std::visit(overload([&](const std::unique_ptr<Identifier>& ee) {
+					print_data("privfun_", *ee);
+				},
+				[&](const std::unique_ptr<MemberAccess>& ee) {
+					print_expression(ee->object, parameters);
+					print_data("->", "fun_", ee->member);
+				},
+				[&](const auto&) {
+					throw std::runtime_error("Internal error.");
+				}
+				), e->function);
+				print_data("(");
+				if(!e->arguments.empty()) {
+					print_expression(e->arguments[0].first, parameters);
+					for(size_t i = 1; i < e->arguments.size(); ++i) {
+						print_data(", ");
+						print_expression(e->arguments[i].first, parameters);
+					}
+				}
+				print_data(")");
 			}
-			print_data(");}");
 		},
 		[&](const std::unique_ptr<BinaryOperation>& e){
 			print_expression(e->left, parameters);
@@ -643,55 +649,46 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 					output.print_endline();
 					output.add_level();
 
-					const char* kind = nullptr;
+					bool dual = false;
 					if(f.declaration_ast->kind) {
 						switch(*f.declaration_ast->kind) {
 						case FunctionKind::DUAL:
-							kind = "dual";
-							break;
-						case FunctionKind::IRREVERSIBLE:
-							kind = "irreversible";
+							dual = true;
 							break;
 						case FunctionKind::NOEFFECT:
+							dual = false;
+							break;
+						default:
+							throw std::runtime_error("Internal error.");
 							break;
 						}
 					}
 
-					if(kind) {
-						output.print_line("journal.start_", kind, "(this);");
-					}
 					output.print_indentation();
-					if(!(dynamic_cast<const VoidTypeInfo*>(f.return_type) && ((!f.declaration_ast->kind) || (!f.dual) || (f.dual->first->first.empty())))) {
+					output.print_data("return journal.add_commit_", dual ? (dynamic_cast<const VoidTypeInfo*>(f.return_type) ? "dual_void" : "dual_return") : "noeffect", "(");
+					/*if(!(dynamic_cast<const VoidTypeInfo*>(f.return_type) && ((!f.declaration_ast->kind) || (!f.dual) || (f.dual->first->first.empty())))) {
 						output.print_data("auto result = ");
+					}*/
+					output.print_data(u8"[_this");
+					for(size_t i = 0; i < f.arguments.size(); ++i) {
+						output.print_data(", var_", f.declaration_ast->arguments[i].second);
 					}
-					output.print_data("basefun_", f.name, '(');
+					output.print_data("](){");
+					output.print_data("return basefun_", f.name, '(');
 					if(!f.arguments.empty()) {
 						output.print_data("var_", f.declaration_ast->arguments[0].second);
 						for(size_t i = 1; i < f.arguments.size(); ++i) {
 							output.print_data(", var_", f.declaration_ast->arguments[i].second);
 						}
 					}
+					output.print_data(");}");
+					if(dual) {
+						output.print_data(", &dualfun_", f.name);
+					}
 					output.print_data(");");
 					output.print_endline();
-					if(kind) {
-						if(*f.declaration_ast->kind == FunctionKind::IRREVERSIBLE) {
-							output.print_line("journal.end_irreversible(this);");
-						} else if (*f.declaration_ast->kind == FunctionKind::DUAL) {
-							if(dynamic_cast<const VoidTypeInfo*>(f.return_type)) {
-								output.print_line("journal.end_dual(this, dualfun_", f.name, ", std::make_tuple());");
-							} else {
-								output.print_line("journal.end_dual(this, dualfun_", f.name, u8", 🍆::pop_tuple(result));");
-							}
-						} else {
-							throw std::runtime_error("Internal error.");
-						}
-					}
-					if(!dynamic_cast<const VoidTypeInfo*>(f.return_type)) {
-						output.print_line("return std::get<0>(result);");
-					}
 					output.remove_level();
 					output.print_line('}');
-					output.print_line();
 				} else if (!f.body_ast) {
 					output.print_indentation();
 					output.print_data("virtual ");

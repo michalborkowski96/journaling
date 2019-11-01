@@ -103,8 +103,32 @@ bool TypeInfo::implicitly_convertible_from(const FunctionalTypeInfo*) const {
 	return false;
 }
 
+bool TypeInfo::requires_call_nojournal_marks() const {
+	return false;
+}
+
+bool TypeInfo::forbids_call_nojournal_marks() const {
+	return false;
+}
+
+bool RealFunctionInfo::requires_call_nojournal_marks() const {
+	return nojournal_marks;
+}
+bool RealFunctionInfo::forbids_call_nojournal_marks() const {
+	return !nojournal_marks;
+}
+
 bool TypeInfo::extendable() const {
 	return false;
+}
+bool TypeInfo::copyable() const {
+	return true;
+}
+bool VoidTypeInfo::copyable() const {
+	return false;
+}
+bool RealClassInfo::copyable() const {
+	return !ast_data->public_variables;
 }
 std::optional<const TypeInfo*> TypeInfo::get_superclass() const {
 	return std::nullopt;
@@ -282,6 +306,12 @@ public:
 		return arg ? std::string("int ") + name + "(int)" : std::string("int ") + name + "()";
 	}
 	virtual ~BuiltinIntFunctionInfo() = default;
+	virtual bool requires_call_nojournal_marks() const override {
+		return true;
+	}
+	virtual bool forbids_call_nojournal_marks() const override {
+		return false;
+	}
 };
 
 class FunctionalTypeInfo : public TypeInfo {
@@ -304,6 +334,9 @@ public:
 	virtual bool check_nojournal_mark(bool) const override {
 		return true;
 	}
+	virtual bool copyable() const override {
+		return false;
+	}
 	virtual bool implicitly_convertible_to(const TypeInfo* o) const override {
 		return o->implicitly_convertible_from(this);
 	}
@@ -315,6 +348,13 @@ public:
 	}
 	virtual std::optional<const TypeInfo*> call_with(const std::vector<const TypeInfo*>& args) const override {
 		return fi->call_with(args);
+	}
+	virtual bool requires_call_nojournal_marks() const override {
+		return fi->requires_call_nojournal_marks();
+	}
+
+	virtual bool forbids_call_nojournal_marks() const override {
+		return fi->forbids_call_nojournal_marks();
 	}
 	virtual ~FunctionalTypeInfo() = default;
 };
@@ -470,6 +510,31 @@ std::optional<std::vector<TypeError>> check_function_block(const TypeInfo* retur
 
 RealClassInfo::RealClassInfo(std::vector<const TypeInfo*> parameters, std::optional<const TypeInfo*> superclass, const ast::Class* ast_data) : parameters(move(parameters)), superclass(move(superclass)), ast_data(ast_data) {}
 
+class PrivateContextFunctionInfo : public FunctionInfo {
+	const FunctionInfo& fi;
+public:
+	PrivateContextFunctionInfo(const FunctionInfo& fi) : fi(fi) {}
+	virtual const TypeInfo* type_info() const override {
+		return fi.type_info();
+	}
+	virtual std::optional<ast::FunctionKind> kind() const override {
+		return fi.kind();
+	}
+	virtual std::optional<const TypeInfo*> call_with(const std::vector<const TypeInfo*>& args) const override {
+		return fi.call_with(args);
+	}
+	virtual std::string full_name() const override {
+		return fi.full_name();
+	}
+	virtual ~PrivateContextFunctionInfo() = default;
+	virtual bool requires_call_nojournal_marks() const override {
+		return false;
+	}
+	virtual bool forbids_call_nojournal_marks() const override {
+		return true;
+	}
+};
+
 bool RealClassInfo::implicitly_convertible_from(const RealClassInfo* o) const {
 	if(this == o) {
 		return true;
@@ -538,6 +603,7 @@ bool RealClassInfo::check_nojournal_mark(bool mark) const {
 bool RealClassInfo::extendable() const {
 	return !ast_data->public_variables;
 }
+
 std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, std::vector<TypeError>> RealClassInfo::make_class(ClassDatabase& class_database, const Class* ast) {
 	std::vector<TypeError> errors;
 	if(ast->parameters.empty() && !ast->optional_functions.empty()) {
@@ -629,6 +695,9 @@ std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, 
 		return errors;
 	};
 
+	std::map<std::string, std::unique_ptr<PrivateContextFunctionInfo>> private_context_function_info;
+	std::map<std::string, std::unique_ptr<FunctionalTypeInfo>> private_context_function_type_info;
+
 	{
 		auto check_argument_declaration = [&](const auto& f) -> std::vector<const TypeInfo*> {
 			std::vector<const TypeInfo*> args;
@@ -656,8 +725,12 @@ std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, 
 			if(type_info->superclass && dynamic_cast<const RealClassInfo*>(*type_info->superclass)) {
 				overridden = dynamic_cast<const RealClassInfo*>(*type_info->superclass)->get_function(f.name.name);
 			}
-			call_with_error_log(errors, RealFunctionInfo::make_function_declaration(overridden, class_database, &f), [&](std::unique_ptr<RealFunctionInfo>&& fi){
-				call_with_error_log(errors, verify_function_declaration(false, f, *fi), [&](){type_info->functions.emplace(f.name.name, std::move(fi));});
+			call_with_error_log(errors, RealFunctionInfo::make_function_declaration(overridden, class_database, &f, ast->nojournal), [&](std::unique_ptr<RealFunctionInfo>&& fi){
+				call_with_error_log(errors, verify_function_declaration(false, f, *fi), [&](){
+					private_context_function_info.emplace(f.name.name, std::make_unique<PrivateContextFunctionInfo>(*fi));
+					private_context_function_type_info.emplace(f.name.name, std::make_unique<FunctionalTypeInfo>(private_context_function_info.at(f.name.name).get()));
+					type_info->functions.emplace(f.name.name, std::move(fi));
+				});
 			});
 		}
 		if(!errors.empty()) {
@@ -676,8 +749,8 @@ std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, 
 		base_variables.add(name, t);
 	}
 
-	for(const auto&[name, f] : type_info->functions) {
-		base_variables.add(name, f->type_info());
+	for(const auto&[name, f] : private_context_function_type_info) {
+		base_variables.add(name, f.get());
 	}
 
 	for(const auto&[name, f] : type_info->functions) {
@@ -738,7 +811,7 @@ std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, 
 			if(type_info->superclass && dynamic_cast<const RealClassInfo*>(*type_info->superclass)) {
 				overridden = dynamic_cast<const RealClassInfo*>(*type_info->superclass)->get_function(f.name.name);
 			}
-			call_with_error_log(optional_errors, RealFunctionInfo::make_function_declaration(overridden, class_database, &f), [&](std::unique_ptr<RealFunctionInfo>&& fi){
+			call_with_error_log(optional_errors, RealFunctionInfo::make_function_declaration(overridden, class_database, &f, ast->nojournal), [&](std::unique_ptr<RealFunctionInfo>&& fi){
 				call_with_error_log(optional_errors, verify_function_declaration(true, f, *fi), [&](){
 					if(optional_functions.find(f.name.name) != optional_functions.end()) {
 						optional_errors.emplace_back(f.name, "Optional function shadows another optional function in same group.");
@@ -756,7 +829,9 @@ std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, 
 		}
 		for(const auto& [fname, null_ptr] : optional_functions) {
 			const auto&[name, f] = *type_info->functions.find(fname);
-			base_variables.add(name, f->type_info());
+			private_context_function_info.emplace(name, std::make_unique<PrivateContextFunctionInfo>(*f));
+			private_context_function_type_info.emplace(name, std::make_unique<FunctionalTypeInfo>(private_context_function_info.at(name).get()));
+			base_variables.add(name, private_context_function_type_info.at(name).get());
 		}
 		for(const auto& [fname, null_ptr] : optional_functions) {
 			const auto&[name, f] = *type_info->functions.find(fname);
@@ -815,7 +890,7 @@ bool RealClassInfo::comes_from_same_pattern(const RealClassInfo& o) const {
 	return ast_data == o.ast_data;
 }
 
-std::variant<std::unique_ptr<RealFunctionInfo>, std::vector<TypeError>> RealFunctionInfo::make_function_declaration(std::optional<const RealFunctionInfo*> overridden, ClassDatabase& class_database, const Function* ast) {
+std::variant<std::unique_ptr<RealFunctionInfo>, std::vector<TypeError>> RealFunctionInfo::make_function_declaration(std::optional<const RealFunctionInfo*> overridden, ClassDatabase& class_database, const Function* ast, bool comes_from_nojournal) {
 	std::vector<TypeError> errors;
 	const TypeInfo* rt;
 	std::vector<const TypeInfo*> args;
@@ -899,7 +974,7 @@ std::variant<std::unique_ptr<RealFunctionInfo>, std::vector<TypeError>> RealFunc
 	if(!errors.empty()) {
 		return errors;
 	} else {
-		return std::unique_ptr<RealFunctionInfo>(new RealFunctionInfo(ast->name.name, std::move(rt), move(args), ast, body, dual));
+		return std::unique_ptr<RealFunctionInfo>(new RealFunctionInfo(ast->name.name, std::move(rt), move(args), ast, body, dual, !comes_from_nojournal));
 	}
 }
 
@@ -922,7 +997,7 @@ std::string RealFunctionInfo::full_name() const {
 
 BuiltinIntFunctionInfo::BuiltinIntFunctionInfo(const TypeInfo* int_type, const char* name, bool arg) : int_type(int_type), name(name), arg(arg), type_info_data(std::make_unique<FunctionalTypeInfo>(this)) {}
 
-RealFunctionInfo::RealFunctionInfo(std::string name, const TypeInfo* return_type, std::vector<const TypeInfo*> arguments, const Function* declaration_ast, std::optional<const Function*> body_ast, std::optional<std::pair<const std::pair<std::vector<std::pair<VariableType, Identifier>>, std::unique_ptr<statement::Block>>*, std::vector<const TypeInfo*>>> dual) : name(move(name)), return_type(std::move(return_type)), type_info_data(std::make_unique<FunctionalTypeInfo>(this)), arguments(move(arguments)), declaration_ast(declaration_ast), body_ast(body_ast), dual(std::move(dual)) {}
+RealFunctionInfo::RealFunctionInfo(std::string name, const TypeInfo* return_type, std::vector<const TypeInfo*> arguments, const Function* declaration_ast, std::optional<const Function*> body_ast, std::optional<std::pair<const std::pair<std::vector<std::pair<VariableType, Identifier>>, std::unique_ptr<statement::Block>>*, std::vector<const TypeInfo*>>> dual, bool nojournal_marks) : name(move(name)), return_type(std::move(return_type)), type_info_data(std::make_unique<FunctionalTypeInfo>(this)), arguments(move(arguments)), declaration_ast(declaration_ast), body_ast(body_ast), dual(std::move(dual)), nojournal_marks(nojournal_marks) {}
 
 std::optional<ExpressionCheckResult> check_expression(std::vector<TypeError>& errors, const VariableMap& variable_map, ClassDatabase& class_database, const Expression& e) {
 	auto check_expr = [&](const Expression& e) {
@@ -1005,6 +1080,17 @@ std::optional<ExpressionCheckResult> check_expression(std::vector<TypeError>& er
 		}
 		return ExpressionCheckResult(tt, false);
 	},
+	[&](const std::unique_ptr<Snapshot>& e)->std::optional<ExpressionCheckResult>{
+		auto et = check_expr(e->value);
+		if(!et) {
+			return std::nullopt;
+		}
+		if(!et->type_info()->copyable()) {
+			errors.emplace_back(*e, "Snapshot of type " + et->type_info()->full_name() + " not possible.");
+			return std::nullopt;
+		}
+		return ExpressionCheckResult(et->type_info(), false);
+	},
 	[&](const std::unique_ptr<Null>&)->std::optional<ExpressionCheckResult>{
 		return ExpressionCheckResult(class_database.get_for_null(), false);
 	},
@@ -1026,46 +1112,59 @@ std::optional<ExpressionCheckResult> check_expression(std::vector<TypeError>& er
 	[&](const std::unique_ptr<FunctionCall>& e)->std::optional<ExpressionCheckResult>{
 		auto t = check_expr(e->function);
 		std::vector<const TypeInfo*> args;
-		for(const Expression& ee : e->arguments) {
-			auto tt = check_expr(ee);
-			if(tt) {
-				args.push_back(tt->type_info());
-			}
-		}
-		if(args.size() != e->arguments.size() || !t) {
+		if(!t) {
 			return std::nullopt;
 		}
-		auto result = t->type_info()->call_with(args);
-		if(result) {
-			return ExpressionCheckResult(*result, false);
-		}
-		errors.emplace_back(*e, "Type " + t->type_info()->full_name() + " cannot be called with (" + types_to_string(args) + ").");
-		return std::nullopt;
-	},
-	[&](const std::unique_ptr<LazyFunctionCall>& e)->std::optional<ExpressionCheckResult>{
-		auto t = check_expr(e->function);
-		std::vector<const TypeInfo*> args;
 		for(const auto&[expr, is_non_journal] : e->arguments) {
 			auto tt = check_expr(expr);
 			if(tt) {
-				if(!tt->type_info()->check_nojournal_mark(is_non_journal)) {
-					if(is_non_journal) {
-						errors.emplace_back(expr, "Expression marked as non-journalable for a lazy call, but type supports journaling.");
-					} else {
-						errors.emplace_back(expr, "Type used in lazy call doesn't support journaling. If you know what you're doing use the ':' mark to silence this error.");
-					}
-				} else {
-					args.push_back(std::move(tt->type_info()));
-				}
+				args.push_back(std::move(tt->type_info()));
 			}
 		}
-		if(args.size() != e->arguments.size() || !t) {
+		if(args.size() != e->arguments.size()) {
 			return std::nullopt;
 		}
 		auto result = t->type_info()->call_with(args);
 		if(result) {
+			bool requires_call_nojournal_marks;
+			bool forbids_call_nojournal_marks;
+			if(auto fun = dynamic_cast<const FunctionalTypeInfo*>(t->type_info())) {
+				requires_call_nojournal_marks = fun->requires_call_nojournal_marks();
+				forbids_call_nojournal_marks = fun->forbids_call_nojournal_marks();
+			} else if (dynamic_cast<const TemplateUnknownTypeInfo*>(t->type_info())) {
+				requires_call_nojournal_marks = false;
+				forbids_call_nojournal_marks = false;
+			} else {
+				throw std::runtime_error("Internal error.");
+			}
+			bool error = false;
+			if(requires_call_nojournal_marks) {
+				for(size_t i = 0; i < args.size(); ++i) {
+					if(!args[i]->check_nojournal_mark(e->arguments[i].second)) {
+						if(e->arguments[i].second) {
+							errors.emplace_back(e->arguments[i].first, "Expression marked as non-journalable, but type supports journaling.");
+						} else {
+							errors.emplace_back(e->arguments[i].first, "Type doesn't support journaling. If you know what you're doing use the ':' mark to silence this error.");
+						}
+						error = true;
+					}
+				}
+			}
+			if(forbids_call_nojournal_marks) {
+				for(const auto&[expr, is_non_journal] : e->arguments) {
+					if(is_non_journal) {
+						errors.emplace_back(expr, "Expression marked as non-journalable in a call for a function that forbids marks.");
+						error = true;
+					}
+				}
+			}
+			if(error) {
+				return std::nullopt;
+			}
 			return ExpressionCheckResult(*result, false);
 		}
+
+
 		errors.emplace_back(*e, "Type " + t->type_info()->full_name() + " cannot be called with (" + types_to_string(args) + ").");
 		return std::nullopt;
 	},
