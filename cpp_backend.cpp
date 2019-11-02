@@ -719,9 +719,9 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 						output.print_data("]() mutable {");
 						output.print_data("return this_ptr->basefun_", f.name, '(');
 						if(!f.arguments.empty()) {
-							output.print_data("var_", f.declaration_ast->arguments[0].second);
+							output.print_data("🍆::capture(var_", f.declaration_ast->arguments[0].second, ')');
 							for(size_t i = 1; i < f.arguments.size(); ++i) {
-								output.print_data(", var_", f.declaration_ast->arguments[i].second);
+								output.print_data(", 🍆::capture(var_", f.declaration_ast->arguments[i].second, ')');
 							}
 						}
 						output.print_data(");}");
