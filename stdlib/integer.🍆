@@ -1,53 +1,59 @@
 import "streamdef_.🍆"
 
-nojournal Integer {
+Integer {
 	int value;
 	fun int to_int() {
 		return value;
-	};
+	} noeffect;
 	constructor(int v) {
 		value = v;
 	};
 	fun Integer add(Integer o) {
 		return new Integer(value + o.to_int());
-	};
+	} noeffect;
 	fun Integer sub(Integer o) {
 		return new Integer(value - o.to_int());
-	};
+	} noeffect;
 	fun Integer mul(Integer o) {
 		return new Integer(value * o.to_int());
-	};
+	} noeffect;
 	fun Integer div(Integer o) {
 		return new Integer(value / o.to_int());
-	};
+	} noeffect;
 	fun Integer mod(Integer o) {
 		return new Integer(value % o.to_int());
-	};
+	} noeffect;
 	fun Integer alt(Integer o) {
 		return new Integer(value || o.to_int());
-	};
+	} noeffect;
 	fun int less(Integer o) {
 		return value < o.to_int();
-	};
+	} noeffect;
 	fun int le(Integer o) {
 		return value <= o.to_int();
-	};
+	} noeffect;
 	fun int more(Integer o) {
 		return value > o.to_int();
-	};
+	} noeffect;
 	fun int me(Integer o) {
 		return value >= o.to_int();
-	};
+	} noeffect;
 	fun Integer opp() {
 		return new Integer(-value);
-	};
+	} noeffect;
 	fun int neg() {
 		return !value;
-	};
+	} noeffect;
 	fun int con(Integer o) {
 		return value && o.to_int();
-	};
+	} noeffect;
 	fun void print(OutputStream o) {
 		o.print_int(value);	
-	};
+	} noeffect;
+	fun int eq(Integer o) {
+		return value == o.to_int();
+	} noeffect;
+	fun int neq(Integer o) {
+		return value != o.to_int();
+	} noeffect;
 }

@@ -726,7 +726,9 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 						}
 						output.print_data(");}");
 						if(dual) {
-							output.print_data(", &dualfun_", f.name);
+							output.print_data(", &");
+							output.print_type(c_);
+							output.print_data("::dualfun_", f.name);
 						}
 						output.print_data(");");
 					}
@@ -738,6 +740,14 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 					output.print_data("virtual ");
 					output.print_owned_type(f.return_type);
 					output.print_data(" privfun_", f.name);
+					output.print_function_arguments(f.declaration_ast->arguments, parameters);
+					output.print_data(" = 0;");
+					output.print_endline();
+
+					output.print_indentation();
+					output.print_data("virtual ");
+					output.print_owned_type(f.return_type);
+					output.print_data(" fun_", f.name);
 					output.print_function_arguments(f.declaration_ast->arguments, parameters);
 					output.print_data(" = 0;");
 					output.print_endline();

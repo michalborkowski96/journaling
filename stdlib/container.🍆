@@ -81,12 +81,12 @@ abstract Container Element Iterator {
 		var Iterator i = begin();
 		o.print_string("{");
 		if(!i.eq(end())) {
-			i.deref().print(o);
+			i.deref().print(:o);
 			i = i.next();
 		}
 		while(!i.eq(end())) {
 			o.print_string(", ");
-			i.deref().print(o);
+			i.deref().print(:o);
 			i = i.next();
 		}
 		o.print_string("}");
