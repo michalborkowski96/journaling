@@ -477,6 +477,7 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 	for(const RealClassInfo* c_ : classes) {
 		const RealClassInfoView c(*c_);
 		const Class& ast_data = *RealClassInfoView(*c_).ast_data;
+
 		std::map<std::string, const TypeInfo*> parameters;
 		for(size_t i = 0; i < c.parameters.size(); ++i) {
 			parameters.emplace(ast_data.parameters[i].name, c.parameters[i]);
@@ -502,9 +503,6 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 		output.print_data(" {");
 		output.print_endline();
 		output.add_level();
-		if(!ast_data.nojournal) {
-			output.print_line(u8"🍆::Journal journal;");
-		}
 		for(const ClassVariable& var : ast_data.variables) {
 			std::visit(overload(
 			[&](const ClassVariableInteger& i) {
@@ -523,6 +521,9 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 			output.remove_level();
 			output.print_line("public:");
 			output.add_level();
+		}
+		if(!ast_data.nojournal && !ast_data.superclass) {
+			output.print_line(u8"🍆::Journal journal;");
 		}
 		if(!ast_data.superclass) {
 			output.print_line(u8"🍆::WeakObject<Type_" , ast_data.name, "> this_ptr;");
