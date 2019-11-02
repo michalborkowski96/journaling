@@ -1,0 +1,8 @@
+nojournal Array Element {
+	constructor(){};
+	fun int size() {return null;};
+	fun Element at(int pos) {return null;};
+	fun Element set(int pos, Element element) {return null;};
+	fun void push_back(Element element) {};
+	fun Element pop_back() {return null;};
+}

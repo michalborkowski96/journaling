@@ -18,16 +18,3 @@ nojournal StdIn : InputStream {
 	fun int get_int() {return null;};
 	fun String get_string() {return null;};
 }
-
-nojournal FileIn : InputStream {
-	constructor(String filename)(){};
-	fun int get_char() {return null;};
-	fun int get_int() {return null;};
-	fun String get_string() {return null;};
-}
-
-nojournal FileOut : OutputStream {
-	constructor(String filename)(){};
-	fun void print_string(String s) {};
-	fun void flush() {};
-}

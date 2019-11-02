@@ -1,6 +1,6 @@
 nojournal String {
 	fun int get(int i) {return null;};
-	fun void set(int i) {};
+	fun void set(int i, int char) {};
 	fun int size() {return null;};
 	fun void resize(int new_size, int char) {};
 	fun void clear() {};

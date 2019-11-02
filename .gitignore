@@ -1,6 +1,7 @@
 stdlib/*.cpp
 stdlib/*.h
 test/*
+!test/*.🍆
 🍆
 *.o
 

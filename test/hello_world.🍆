@@ -1,0 +1,10 @@
+import "../stdlib/iostream.🍆"
+
+struct Main {
+	constructor(){};
+	fun void main(){
+		var StdIn in = new StdIn();
+		var StdOut out = new StdOut();
+		out.print_string_ln("Masz raka " + in.get_string());
+	};
+}

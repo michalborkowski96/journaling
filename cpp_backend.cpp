@@ -474,6 +474,8 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 		}
 	}
 
+	std::set<std::string> defined_templates;
+
 	for(const RealClassInfo* c_ : classes) {
 		const RealClassInfoView c(*c_);
 		const Class& ast_data = *RealClassInfoView(*c_).ast_data;
@@ -483,12 +485,16 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 			parameters.emplace(ast_data.parameters[i].name, c.parameters[i]);
 		}
 
-		output.print_line(u8"#ifndef 🍆", ast_data.name);
+		output.print_line(u8"#ifdef 🍆_Default_", ast_data.name);
+		if(defined_templates.find(ast_data.name.name) == defined_templates.end()) {
+			output.print_line(u8"🍆_Default_", ast_data.name);
+		} else {
+			defined_templates.insert(ast_data.name.name);
+		}
+		output.print_line(u8"#else");
 
 		if(!c.parameters.empty()) {
 			output.print_line("template <>");
-		} else {
-			output.print_line(u8"#define 🍆", ast_data.name);
 		}
 
 		output.print_indentation();
@@ -601,7 +607,31 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 
 				if (f.body_ast && (*f.body_ast) == f.declaration_ast) {
 					output.print_indentation();
-					output.print_data("auto basefun_", f.name);
+
+					{
+						bool void_return_type = dynamic_cast<const VoidTypeInfo*>(f.return_type);
+						if(void_return_type && (!f.dual || f.dual->second.empty())) {
+							output.print_data("void");
+						} else {
+							output.print_data("std::tuple<");
+							if(!void_return_type) {
+								output.print_owned_type(f.return_type);
+							}
+							if(f.dual && !f.dual->second.empty()) {
+								if(void_return_type) {
+									output.print_data(", ");
+								}
+								output.print_type(f.dual->second[0]);
+								for(size_t i = 1; i < f.dual->second.size(); ++i) {
+									output.print_data(", ");
+									output.print_type(f.dual->second[i]);
+								}
+							}
+							output.print_data('>');
+						}
+					}
+
+					output.print_data(" basefun_", f.name);
 					output.print_function_arguments(f.declaration_ast->arguments, parameters);
 					output.print_data(' ');
 					output.print_block(**(*f.body_ast)->body, parameters);

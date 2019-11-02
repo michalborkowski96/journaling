@@ -25,6 +25,18 @@ abstract nojournal OutputStream {
 		}
 		print_digit(d.deref());
 	};
+	fun void print_string_ln(String s) {
+		print_string(s);
+		print_newline();
+	};
+	fun void print_int_ln(int i) {
+		print_int(i);
+		print_newline();
+	};
+	fun void print_newline() {
+		print_string("
+");
+	};
 	fun void print_digit(int i) {
 		var String s = new String();
 		s.resize(1, i - '0');
