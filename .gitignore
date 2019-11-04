@@ -1,7 +1,6 @@
-stdlib/*.cpp
-stdlib/*.h
 test/*
 !test/*.🍆
-🍆
+!test/run.cpp
+/🍆
 *.o
 

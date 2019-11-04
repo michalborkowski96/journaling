@@ -1,0 +1,347 @@
+#ifndef 🍆
+#define 🍆
+
+#include <variant>
+#include <functional>
+#include <memory>
+#include <type_traits>
+#include <tuple>
+
+namespace 🍆 {
+	template <typename... Fs>
+	struct overload : std::remove_reference_t<Fs>... {
+		overload(Fs... fs) : std::remove_reference_t<Fs>{std::forward<Fs>(fs)}...{}
+		using std::remove_reference_t<Fs>::operator()...;
+	};
+
+	class Null {};
+
+	Null null;
+
+	template<typename T>
+	class StrongObject;
+
+	class Integer;
+
+	template<>
+	class StrongObject<Integer> {
+		std::variant<long long, std::shared_ptr<std::function<StrongObject<Integer>()>>> value;
+	public:
+		using object_type = Integer;
+		StrongObject<Integer>();
+		StrongObject<Integer>(const Null&);
+		StrongObject<Integer>(Integer value);
+		StrongObject<Integer>(long long value);
+		StrongObject<Integer>(std::shared_ptr<std::function<StrongObject<Integer>()>> fun) : value(std::move(fun)) {}
+
+		Integer& operator*();
+		Integer* operator->();
+		StrongObject<Integer> operator==(StrongObject<Integer> b);
+		StrongObject<Integer> operator!=(StrongObject<Integer> b);
+
+		explicit operator bool();
+
+		long long& get_value() {
+			return std::visit(overload(
+			[](long long& v)->long long&{return v;},
+			[&](std::shared_ptr<std::function<StrongObject<Integer>()>>& f)->long long&{
+				long long val = (*f)().get_value();
+				*f = [=](){
+					return StrongObject<Integer>(val);
+				};
+				value = val;
+				return std::get<long long>(value);
+			}
+			), value);
+		}
+
+		friend class Integer;
+	};
+
+	class Integer {
+		long long value;
+	public:
+		Integer() = delete;
+		StrongObject<Integer> fun_add(StrongObject<Integer> o) const {
+			return StrongObject<Integer>(value + o.get_value());
+		}
+		StrongObject<Integer> fun_sub(StrongObject<Integer> o) const {
+			return StrongObject<Integer>(value - o.get_value());
+		}
+		StrongObject<Integer> fun_mul(StrongObject<Integer> o) const {
+			return StrongObject<Integer>(value * o.get_value());
+		}
+		StrongObject<Integer> fun_div(StrongObject<Integer> o) const {
+			return StrongObject<Integer>(value / o.get_value());
+		}
+		StrongObject<Integer> fun_mod(StrongObject<Integer> o) const {
+			return StrongObject<Integer>(value % o.get_value());
+		}
+		StrongObject<Integer> fun_alt(StrongObject<Integer> o) const {
+			return StrongObject<Integer>(value || o.get_value());
+		}
+		StrongObject<Integer> fun_less(StrongObject<Integer> o) const {
+			return StrongObject<Integer>(value < o.get_value());
+		}
+		StrongObject<Integer> fun_le(StrongObject<Integer> o) const {
+			return StrongObject<Integer>(value <= o.get_value());
+		}
+		StrongObject<Integer> fun_more(StrongObject<Integer> o) const {
+			return StrongObject<Integer>(value > o.get_value());
+		}
+		StrongObject<Integer> fun_me(StrongObject<Integer> o) const {
+			return StrongObject<Integer>(value >= o.get_value());
+		}
+		StrongObject<Integer> fun_opp() const {
+			return StrongObject<Integer>(-value);
+		}
+		StrongObject<Integer> fun_neg() const {
+			return StrongObject<Integer>(!value);
+		}
+		StrongObject<Integer> fun_con(StrongObject<Integer> o) const {
+			return StrongObject<Integer>(value && o.get_value());
+		}
+/*
+		StrongObject<Integer> operator==(StrongObject<Integer> b) const {
+			return StrongObject<Integer>(value == b.get_value());
+		}
+		StrongObject<Integer> operator!=(StrongObject<Integer> b) const {
+			return StrongObject<Integer>(value != b.get_value());
+		}
+*/
+		static Integer* cast_from(long long* value) {
+			return reinterpret_cast<Integer*>(value);
+		}
+/*
+		explicit operator bool() const {
+			return value;
+		}
+*/
+		long long& to_ll() {
+			return value;
+		}
+	};
+
+	StrongObject<Integer>::StrongObject() : value(0LL) {}
+
+	StrongObject<Integer>::StrongObject(const Null&) : value(0LL) {}
+
+	StrongObject<Integer>::StrongObject(Integer value) : value(value.to_ll()) {}
+
+	StrongObject<Integer>::StrongObject(long long value) : value(value) {}
+
+	Integer& StrongObject<Integer>::operator*() {
+		return *Integer::cast_from(&get_value());
+	}
+	Integer* StrongObject<Integer>::operator->() {
+		return Integer::cast_from(&get_value());
+	}
+	StrongObject<Integer> StrongObject<Integer>::operator==(StrongObject<Integer> b) {
+		return std::visit(overload(
+		[&](long long& v){return v == b.get_value();},
+		[&](std::shared_ptr<std::function<StrongObject<Integer>()>>& fa){
+			return std::visit(overload(
+			[&](long long& v){return v == get_value();},
+			[&](std::shared_ptr<std::function<StrongObject<Integer>()>>& fb){
+				if(fa == fb) {
+					return true;
+				}
+				return get_value() == b.get_value();
+			}
+			), b.value);
+		}
+		), value);
+	}
+	StrongObject<Integer> StrongObject<Integer>::operator!=(StrongObject<Integer> b) {
+		return !(*this == b);
+	}
+
+	StrongObject<Integer>::operator bool() {
+		return get_value();
+	}
+
+	template<typename T>
+	class WeakObject;
+
+	const std::shared_ptr<std::function<std::shared_ptr<void>()>> null_ptr_fun = std::make_shared<std::function<std::shared_ptr<void>()>>([]()->std::shared_ptr<void>{return nullptr;});
+
+	template<typename T>
+	class StrongObject {
+		std::shared_ptr<std::function<std::shared_ptr<void>()>> obj;
+		friend class WeakObject<T>;
+		template<typename U>
+		friend class StrongObject;
+	public:
+		using object_type = T;
+		T& operator*() {
+			return *get_value();
+		}
+		T* operator->() {
+			return get_value().get();
+		}
+		StrongObject(const Null&) : obj(null_ptr_fun) {}
+		StrongObject() : obj(null_ptr_fun) {}
+		StrongObject(const WeakObject<T>& o);
+		StrongObject(std::shared_ptr<std::function<std::shared_ptr<void>()>> fun) : obj(std::move(fun)) {}
+		template<typename U, std::enable_if_t<std::is_convertible<U*, T*>::value, int> = 0>
+		StrongObject(StrongObject<U> o) : obj(o.obj) {}
+
+		template<typename... Ts>
+		static StrongObject make_object(Ts&&... args) {
+			StrongObject ret;
+			char* memory = new char[sizeof(T)];
+			std::shared_ptr<T> ptr(reinterpret_cast<T*>(memory), std::function<void(T*)>([](T* ptr){
+				delete[](reinterpret_cast<char*>(ptr));
+			}));
+			ret.obj = std::make_shared<std::function<std::shared_ptr<void>()>>([=]()->std::shared_ptr<void>{return ptr;});
+			new (reinterpret_cast<T*>(memory)) T(ret, std::forward<Ts>(args)...);
+			*std::get_deleter<std::function<void(T*)>>(ptr) = [](T* ptr){
+				ptr->~T();
+				delete[](reinterpret_cast<char*>(ptr));
+			};
+			return ret;
+		}
+
+		StrongObject<Integer> operator==(StrongObject<T> b) {
+			if(obj == b.obj) {
+				return true;
+			}
+			return get_value() == b.get_value();
+		}
+		StrongObject<Integer> operator!=(StrongObject<T> b) {
+			return !(*this == b);
+		}
+/*
+		explicit operator bool() const {
+			return obj;
+		}
+*/
+		std::shared_ptr<T> get_value() {
+			std::shared_ptr<T> val = std::static_pointer_cast<T>((*obj)());
+			*obj = [=](){
+				return val;
+			};
+			return val;
+		}
+
+		template<typename U>
+		static StrongObject scast(StrongObject<U> o) {
+			return StrongObject(o.obj);
+		}
+
+		template<typename U>
+		static StrongObject dcast(StrongObject<U> o) {
+			std::shared_ptr<U> value = o.get_value();
+			if(!value) {
+				return null;
+			}
+			return std::make_shared<std::function<std::shared_ptr<void>()>>([val{std::dynamic_pointer_cast<T>(value)}](){return val;});
+		}
+	};
+
+	template<typename T>
+	class WeakObject {
+		std::weak_ptr<std::function<std::shared_ptr<void>()>> obj;
+		friend class StrongObject<T>;
+		template<typename U>
+		friend class WeakObject;
+	public:
+		using object_type = T;
+		T& operator*() {
+			return *get_value();
+		}
+		T* operator->() {
+			return get_value().get();
+		}
+		WeakObject(const Null&) : obj(null_ptr_fun) {}
+		WeakObject(std::weak_ptr<std::function<std::shared_ptr<T>()>> obj) : obj(obj) {}
+		WeakObject() : obj(null_ptr_fun) {}
+		WeakObject(const StrongObject<T>& o) : obj(o.obj) {}
+		template<typename U, std::enable_if_t<std::is_convertible<U*, T*>::value, int> = 0>
+		WeakObject(WeakObject<U> o) : obj(o.obj) {}
+		StrongObject<Integer> operator==(WeakObject<T> b) {
+			return StrongObject<T>(*this) == StrongObject<T>(b);
+		}
+		StrongObject<Integer> operator!=(WeakObject<T> b) {
+			return !(*this == b);
+		}
+/*
+		explicit operator bool() const {
+			return obj;
+		}
+*/
+		std::shared_ptr<T> get_value() {
+			auto locked = obj.lock();
+			std::shared_ptr<T> val = std::static_pointer_cast<T>((*locked)());
+			*locked = [=](){
+				return val;
+			};
+			return val;
+		}
+	};
+
+	template<>
+	class WeakObject<Integer>;
+
+	template<typename T>
+	StrongObject<T>::StrongObject(const WeakObject<T>& o) : obj(o.obj.lock()) {}
+
+	template<typename T, typename... Ts>
+	StrongObject<T> make_object(Ts&&... args) {
+		return StrongObject<T>::make_object(std::forward<Ts>(args)...);
+	}
+
+	template<typename T>
+	class has_journal;
+
+	template<typename T, typename P, typename U = typename P::object_type>
+	StrongObject<T> dcast(P o) {
+		return StrongObject<T>::dcast(StrongObject<U>(o));
+	}
+
+	template<typename T, typename P, typename U = typename P::object_type>
+	StrongObject<T> scast(P o) {
+		return StrongObject<T>::scast(StrongObject<U>(o));
+	}
+
+	class Journal {
+#warning JOURNAL
+	public:
+		template<typename F, typename T = typename std::tuple_element_t<0, std::invoke_result_t<F>>::object_type>
+		StrongObject<T> add_commit_noeffect(F fun);
+
+		template<typename F, std::enable_if_t<std::is_same_v<std::invoke_result_t<F>, void>, int> = 0>
+		void add_commit_noeffect(F fun);
+
+		template<typename F, typename D>
+		void add_commit_dual_void(F fun, D dual);
+
+		template<typename F, typename D, typename T = typename std::tuple_element_t<0, std::invoke_result_t<F>>::object_type>
+		StrongObject<T> add_commit_dual_return(F fun, D dual);
+	};
+
+#warning SNAPSHOT
+	template<typename P, typename T = typename P::object_type, std::enable_if_t<has_journal<T>::value, int> = 0>
+	StrongObject<T> snapshot(P obj);
+
+	template<typename P, typename T = typename P::object_type, std::enable_if_t<has_journal<T>::value, int> = 0>
+	StrongObject<T> capture(P obj){
+		return snapshot(obj);
+	}
+
+	template<typename P, typename T = typename P::object_type, std::enable_if_t<!has_journal<T>::value, int> = 0>
+	StrongObject<T> capture(P obj){
+		return obj;
+	}
+
+	StrongObject<Integer> capture(const StrongObject<Integer>& obj){
+		return obj;
+	}
+}
+
+#include "array.h"
+#include "error.h"
+#include "stdio_.h"
+#include "string.h"
+
+#endif

@@ -181,7 +181,7 @@ public:
 			print_data("->fun_", e->boolean ? NEG_FUN_NAME : OPP_FUN_NAME, "()");
 		},
 		[&](const std::unique_ptr<Cast>& e){
-			print_data(u8"🍆::cast<");
+			print_data(u8"🍆::dcast<");
 			print_type(e->target_type, parameters);
 			print_data(">(");
 			print_expression(e->value, parameters);
@@ -196,7 +196,7 @@ public:
 			print_data(u8"🍆::null");
 		},
 		[&](const std::unique_ptr<This>&){
-			print_data("this_ptr");
+			print_data("get_this()");
 		},
 		[&](const std::unique_ptr<MemberAccess>& e){
 			print_expression(e->object, parameters);
@@ -207,10 +207,10 @@ public:
 				print_data(u8"🍆::lazy_call([");
 
 				std::visit(overload([&](const std::unique_ptr<Identifier>&) {
-					print_data(u8"this_ptr{🍆::capture(this_ptr)}");
+					print_data(u8"obj_ptr{🍆::capture(get_this())}");
 				},
 				[&](const std::unique_ptr<MemberAccess>& ee) {
-					print_data(u8"this_ptr{🍆::capture");
+					print_data(u8"obj_ptr{🍆::capture");
 					print_expression(ee->object, parameters);
 					print_data("}");
 				},
@@ -225,7 +225,7 @@ public:
 					print_data("}");
 				}
 
-				print_data("]() mutable {return this_ptr->");
+				print_data("]() mutable {return obj_ptr->");
 				std::visit(overload([&](const std::unique_ptr<Identifier>& ee) {
 					print_data("privfun_", *ee);
 				},
@@ -478,11 +478,21 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 
 	for(const RealClassInfo* c_ : classes) {
 		const RealClassInfoView c(*c_);
-		const Class& ast_data = *RealClassInfoView(*c_).ast_data;
+		const Class& ast_data = *c.ast_data;
 
 		std::map<std::string, const TypeInfo*> parameters;
 		for(size_t i = 0; i < c.parameters.size(); ++i) {
 			parameters.emplace(ast_data.parameters[i].name, c.parameters[i]);
+		}
+
+		{
+			output.print_line("template <>");
+			output.print_indentation();
+			output.print_data("struct 🍆::has_journal<");
+			output.print_type(c_);
+			output.print_data("> : public std::", ast_data.nojournal ? "false" : "true", "_type {};");
+			output.print_endline();
+			output.print_line();
 		}
 
 		output.print_line(u8"#ifdef 🍆_Default_", ast_data.name);
@@ -533,13 +543,20 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 		}
 		if(!ast_data.superclass) {
 			output.print_line(u8"🍆::WeakObject<Type_" , ast_data.name, "> this_ptr;");
-		} else {
-			output.print_indentation();
-			output.print_data("using ");
-			output.print_type(*ast_data.superclass, parameters);
-			output.print_data("::this_ptr;");
-			output.print_endline();
 		}
+
+		output.print_indentation();
+		output.print_owned_type(c_);
+		output.print_data(" get_this() {");
+		output.print_endline();
+		output.add_level();
+		output.print_indentation();
+		output.print_data(u8"return 🍆::scast<");
+		output.print_type(c_);
+		output.print_data(">(this_ptr);");
+		output.print_endline();
+		output.remove_level();
+		output.print_line("}");
 
 		{
 			if(ast_data.destructor) {
@@ -618,13 +635,13 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 								output.print_owned_type(f.return_type);
 							}
 							if(f.dual && !f.dual->second.empty()) {
-								if(void_return_type) {
+								if(!void_return_type) {
 									output.print_data(", ");
 								}
-								output.print_type(f.dual->second[0]);
+								output.print_owned_type(f.dual->second[0]);
 								for(size_t i = 1; i < f.dual->second.size(); ++i) {
 									output.print_data(", ");
-									output.print_type(f.dual->second[i]);
+									output.print_owned_type(f.dual->second[i]);
 								}
 							}
 							output.print_data('>');
@@ -666,9 +683,28 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 					if(f.dual) {
 						output.print_indentation();
 						output.print_data("void dualfun_", f.name);
-						output.print_function_arguments(f.dual->first->first, parameters);
-						output.print_data(' ');
-						output.print_block(*f.dual->first->second, parameters);
+						if(f.declaration_ast->dual) {
+							output.print_function_arguments(f.dual->first->first, parameters);
+							output.print_data(' ');
+							output.print_block(*f.dual->first->second, parameters);
+						} else {
+							auto superclass = std::make_unique<RealClassInfoView>(dynamic_cast<const RealClassInfo&>(**c.superclass));
+							while(true) {
+								RealFunctionInfoView df(*superclass->functions.at(f.name));
+								if(df.declaration_ast->dual) {
+									const Class& superclass_ast_data = *superclass->ast_data;
+									std::map<std::string, const TypeInfo*> dual_parameters;
+									for(size_t i = 0; i < superclass->parameters.size(); ++i) {
+										dual_parameters.emplace(superclass_ast_data.parameters[i].name, superclass->parameters[i]);
+									}
+									output.print_function_arguments(df.dual->first->first, dual_parameters);
+									output.print_data(' ');
+									output.print_block(*df.dual->first->second, dual_parameters);
+									break;
+								}
+								superclass = std::make_unique<RealClassInfoView>(dynamic_cast<const RealClassInfo&>(**superclass->superclass));
+							}
+						}
 					}
 
 					output.print_indentation();
@@ -712,12 +748,12 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 						output.print_data("));");
 					} else {
 						output.print_data("return journal.add_commit_", dual ? (dynamic_cast<const VoidTypeInfo*>(f.return_type) ? "dual_void" : "dual_return") : "noeffect", "(");
-						output.print_data(u8"[this_ptr{this_ptr}");
+						output.print_data(u8"[obj_ptr{get_this()}");
 						for(size_t i = 0; i < f.arguments.size(); ++i) {
 							output.print_data(", var_", f.declaration_ast->arguments[i].second);
 						}
 						output.print_data("]() mutable {");
-						output.print_data("return this_ptr->basefun_", f.name, '(');
+						output.print_data("return obj_ptr->basefun_", f.name, '(');
 						if(!f.arguments.empty()) {
 							output.print_data("🍆::capture(var_", f.declaration_ast->arguments[0].second, ')');
 							for(size_t i = 1; i < f.arguments.size(); ++i) {
@@ -759,16 +795,6 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 		output.print_line("};");
 		output.print_line("#endif");
 		output.print_line();
-
-		{
-			output.print_line("template <>");
-			output.print_indentation();
-			output.print_data("struct 🍆::has_journal<");
-			output.print_type(c_);
-			output.print_data("> : public std::", ast_data.nojournal ? "false" : "true", "_type {};");
-			output.print_endline();
-			output.print_line();
-		}
 	}
 }
 }

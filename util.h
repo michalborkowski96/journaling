@@ -38,7 +38,6 @@ using Wrap = T<U<Vs>...>;
 template <typename... Fs>
 struct overload : std::remove_reference_t<Fs>... {
 	overload(Fs... fs) : std::remove_reference_t<Fs>{std::forward<Fs>(fs)}...{}
-
 	using std::remove_reference_t<Fs>::operator()...;
 };
 
