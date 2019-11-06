@@ -121,14 +121,14 @@ bool RealFunctionInfo::forbids_call_nojournal_marks() const {
 bool TypeInfo::extendable() const {
 	return false;
 }
-bool TypeInfo::copyable() const {
+bool TypeInfo::snapshot_possible() const {
 	return true;
 }
-bool VoidTypeInfo::copyable() const {
+bool VoidTypeInfo::snapshot_possible() const {
 	return false;
 }
-bool RealClassInfo::copyable() const {
-	return !ast_data->public_variables;
+bool RealClassInfo::snapshot_possible() const {
+	return !ast_data->nojournal;
 }
 std::optional<const TypeInfo*> TypeInfo::get_superclass() const {
 	return std::nullopt;
@@ -334,7 +334,7 @@ public:
 	virtual bool check_nojournal_mark(bool) const override {
 		return true;
 	}
-	virtual bool copyable() const override {
+	virtual bool snapshot_possible() const override {
 		return false;
 	}
 	virtual bool implicitly_convertible_to(const TypeInfo* o) const override {
@@ -1085,7 +1085,7 @@ std::optional<ExpressionCheckResult> check_expression(std::vector<TypeError>& er
 		if(!et) {
 			return std::nullopt;
 		}
-		if(!et->type_info()->copyable()) {
+		if(!et->type_info()->snapshot_possible()) {
 			errors.emplace_back(*e, "Snapshot of type " + et->type_info()->full_name() + " not possible.");
 			return std::nullopt;
 		}

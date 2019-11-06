@@ -60,7 +60,7 @@ class TypeInfo {
 	TypeInfo(const TypeInfo&) = delete;
 	TypeInfo(TypeInfo&&) = delete;
 public:
-	virtual bool copyable() const;
+	virtual bool snapshot_possible() const;
 	virtual bool extendable() const;
 	virtual std::optional<const TypeInfo*> get_superclass() const;
 	virtual bool constructible_with(const std::vector<const TypeInfo*>&) const;
@@ -197,7 +197,7 @@ class RealClassInfo : public TypeInfo {
 	virtual bool implicitly_convertible_from(const IntTypeInfo*) const override;
 	virtual bool implicitly_convertible_from(const TemplateUnknownTypeInfo*) const override;
 public:
-	virtual bool copyable() const override;
+	virtual bool snapshot_possible() const override;
 	virtual std::optional<const TypeInfo*> get_superclass() const override;
 	virtual ~RealClassInfo() = default;
 	virtual bool constructible_with(const std::vector<const TypeInfo*>& args) const override;
@@ -249,7 +249,7 @@ class VoidTypeInfo : public TypeInfo {
 	virtual bool implicitly_convertible_from(const TemplateUnknownTypeInfo*) const override;
 	virtual bool implicitly_convertible_from(const VoidTypeInfo*) const override;
 public:
-	virtual bool copyable() const override;
+	virtual bool snapshot_possible() const override;
 	virtual bool check_nojournal_mark(bool mark) const override;
 	virtual bool implicitly_convertible_to(const TypeInfo* o) const override;
 	virtual std::string full_name() const override;

@@ -1,6 +1,8 @@
 #ifndef 🍆
 #define 🍆
 
+#include "tagged_tree.h"
+
 #include <variant>
 #include <functional>
 #include <memory>
@@ -305,19 +307,40 @@ namespace 🍆 {
 	}
 
 	class Journal {
+		template<typename...>
+		struct unpack_to_args;
+
+		template<typename R, typename O, typename... Ts>
+		struct unpack_to_args<R, O, std::tuple<Ts...>> {
+			using type = R (O::*)(Ts...);
+		};
+
+		template<typename...>
+		struct unpack_to_args_skip_first;
+
+		template<typename R, typename O, typename T, typename... Ts>
+		struct unpack_to_args_skip_first<R, O, std::tuple<T, Ts...>> {
+			using type = R (O::*)(Ts...);
+		};
 #warning JOURNAL
 	public:
-		template<typename F, typename T = typename std::tuple_element_t<0, std::invoke_result_t<F>>::object_type>
-		StrongObject<T> add_commit_noeffect(F fun);
+		template<typename O, typename R, std::enable_if_t<!std::is_same_v<R, void>, int> = 0, typename... Args>
+		std::tuple_element_t<0, R> add_commit_noeffect(StrongObject<O> obj, R (O::*basefun)(StrongObject<Args>...), StrongObject<Args>...);
 
-		template<typename F, std::enable_if_t<std::is_same_v<std::invoke_result_t<F>, void>, int> = 0>
-		void add_commit_noeffect(F fun);
+		template<typename O, typename... Args>
+		void add_commit_noeffect(StrongObject<O> obj, void (O::*basefun)(StrongObject<Args>...), StrongObject<Args>...);
 
-		template<typename F, typename D>
-		void add_commit_dual_void(F fun, D dual);
+		template<typename O, typename R, std::enable_if_t<!std::is_same_v<R, void>, int> = 0, typename... Args>
+		void add_commit_dual(StrongObject<O> obj, R (O::*basefun)(StrongObject<Args>...), typename unpack_to_args<void, O, R>::type dualfun, StrongObject<Args>...);
 
-		template<typename F, typename D, typename T = typename std::tuple_element_t<0, std::invoke_result_t<F>>::object_type>
-		StrongObject<T> add_commit_dual_return(F fun, D dual);
+		template<typename O, typename... Args>
+		void add_commit_dual(StrongObject<O> obj, void (O::*basefun)(StrongObject<Args>...), void (O::*dualfun)(), StrongObject<Args>...);
+
+		template<typename O, typename R, std::enable_if_t<!std::is_same_v<R, void>, int> = 0, typename... Args>
+		std::tuple_element_t<0, R> add_commit_dual(StrongObject<O> obj, R (O::*basefun)(StrongObject<Args>...), typename unpack_to_args_skip_first<void, O, R>::type dualfun, StrongObject<Args>...);
+
+		template<typename O, typename R, std::enable_if_t<!std::is_same_v<R, void>, int> = 0, typename... Args>
+		StrongObject<R> add_commit_dual(StrongObject<O> obj, std::tuple<StrongObject<R>> (O::*basefun)(StrongObject<Args>...), void (O::*dualfun)(), StrongObject<Args>...);
 	};
 
 #warning SNAPSHOT
@@ -339,9 +362,6 @@ namespace 🍆 {
 	}
 }
 
-#include "array.h"
-#include "error.h"
-#include "stdio_.h"
-#include "string.h"
+#include "overrides.h"
 
 #endif

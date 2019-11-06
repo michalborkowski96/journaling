@@ -747,24 +747,17 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 						}
 						output.print_data("));");
 					} else {
-						output.print_data("return journal.add_commit_", dual ? (dynamic_cast<const VoidTypeInfo*>(f.return_type) ? "dual_void" : "dual_return") : "noeffect", "(");
-						output.print_data(u8"[obj_ptr{get_this()}");
-						for(size_t i = 0; i < f.arguments.size(); ++i) {
-							output.print_data(", var_", f.declaration_ast->arguments[i].second);
-						}
-						output.print_data("]() mutable {");
-						output.print_data("return obj_ptr->basefun_", f.name, '(');
-						if(!f.arguments.empty()) {
-							output.print_data("🍆::capture(var_", f.declaration_ast->arguments[0].second, ')');
-							for(size_t i = 1; i < f.arguments.size(); ++i) {
-								output.print_data(", 🍆::capture(var_", f.declaration_ast->arguments[i].second, ')');
-							}
-						}
-						output.print_data(");}");
+						output.print_data("return journal.add_commit_", dual ? "dual" : "noeffect", "(");
+						output.print_data("get_this(), &");
+						output.print_type(c_);
+						output.print_data("::basefun_", f.name);
 						if(dual) {
 							output.print_data(", &");
 							output.print_type(c_);
 							output.print_data("::dualfun_", f.name);
+						}
+						for(size_t i = 0; i < f.arguments.size(); ++i) {
+							output.print_data(", var_", f.declaration_ast->arguments[i].second);
 						}
 						output.print_data(");");
 					}
