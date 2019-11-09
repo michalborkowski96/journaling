@@ -1,0 +1,7 @@
+struct JournalTag {}
+
+nojournal JournalTools T {
+	constructor(T object){};
+	fun JournalTag getTag(){return null;};
+	fun void gotoTag(JournalTag tag){};
+}
