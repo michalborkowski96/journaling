@@ -326,11 +326,58 @@ namespace 🍆 {
 			using type = R (O::*)(Ts...);
 		};
 
-#warning TAG
-		class Tag {};
-		Tag get_tag() const;
-		void force_tag(Tag);
-		void goto_tag(Tag);
+		class Tag {
+			std::shared_ptr<TaggedTree<std::tuple<std::function<void()>, std::function<void()>, size_t>>> tree;
+			TaggedTree<std::tuple<std::function<void()>, std::function<void()>, size_t>>::Vertex* vertex;
+			Tag(decltype(tree) tree, decltype(vertex) vertex) : tree(std::move(tree)), vertex(vertex) {}
+			void destroy(){
+				if(tree && ((--std::get<2>(vertex->data)) == 0)) {
+					vertex->untag(*tree);
+					tree = nullptr;
+				}
+			}
+		public:
+			Tag() = delete;
+			Tag& operator=(const Tag& o) {
+				destroy();
+				tree = o.tree;
+				vertex = o.vertex;
+				++std::get<2>(vertex->data);
+				return *this;
+			}
+			Tag& operator=(Tag&& o) {
+				destroy();
+				tree = std::move(o.tree);
+				vertex = o.vertex;
+				return *this;
+			}
+			Tag(const Tag& o) : tree(o.tree), vertex(o.vertex) {
+				++std::get<2>(vertex->data);
+			}
+			Tag(Tag&& o) : tree(std::move(o.tree)), vertex(o.vertex) {}
+			~Tag() {
+				destroy();
+			}
+			static Tag make_new() {
+				auto tree = TaggedTree<std::tuple<std::function<void()>, std::function<void()>, size_t>>::make_tree(std::make_tuple(std::function<void()>(), std::function<void()>(), 1));
+				return Tag(std::move(tree.first), tree.second);
+			}
+			Tag grow(std::function<void()> there, std::function<void()> back) const {
+				auto new_vertex = vertex->grow(std::make_tuple(std::move(there), std::move(back), 1));
+				return Tag(tree, new_vertex);
+			}
+		};
+
+		Tag tag;
+
+		Tag get_tag() const {
+			return tag;
+		}
+		void force_tag(const Tag& t) {
+			tag = t;
+		}
+#warning GOTO_TAG
+		void goto_tag(const Tag&);
 
 		template<typename...>
 		struct count_types_with_journal;
@@ -347,21 +394,28 @@ namespace 🍆 {
 			static constexpr size_t value = (has_journal<T>::value ? 1 : 0) + count_types_with_journal<Ts...>::value;
 		};
 
-#warning CAPTURED
 		template<typename T, bool journal = has_journal<T>::value>
-		class Captured;
+		struct Captured;
 
 		template<typename T>
-		class Captured<T, true> {
+		struct Captured<T, true> {
+			using has_journal = std::true_type;
 			Tag tag;
 			StrongObject<T> object;
 			Captured() = delete;
+			Captured(const Captured&) = delete;
+			Captured(Captured&&) = default;
+			Captured(Tag tag, StrongObject<T> object) : tag(std::move(tag)), object(std::move(object)) {}
 		};
 
 		template<typename T>
-		class Captured<T, false> {
+		struct Captured<T, false> {
+			using has_journal = std::false_type;
 			StrongObject<T> object;
 			Captured() = delete;
+			Captured(const Captured&) = delete;
+			Captured(Captured&&) = default;
+			Captured(StrongObject<T> object) : object(std::move(object)) {}
 		};
 
 		template<typename T, typename... Ts>
@@ -369,25 +423,70 @@ namespace 🍆 {
 			return std::apply([](const auto&, auto&&... args){return std::make_tuple(std::move(args)...);}, tuple);
 		}
 
-#warning CAPTURE
-		template<typename... Args>
-		static std::tuple<Captured<Args>...> capture(const StrongObject<Args>&... args);
+		template<typename T, std::enable_if_t<has_journal<T>::value, int> = 0>
+		static Captured<T> capture_do(StrongObject<T>& arg) {
+			return Captured<T>(arg->journal.get_tag(), arg);
+		}
 
-#warning CAPTURED_GET
-		template<typename... Args>
-		static std::tuple<StrongObject<Args>...> captured_get(std::tuple<Captured<Args>...>& args);
+		template<typename T, std::enable_if_t<!has_journal<T>::value, int> = 0>
+		static Captured<T> capture_do(StrongObject<T>& arg) {
+			return Captured<T>(arg);
+		}
 
-#warning GET_TAGS
 		template<typename... Args>
-		static std::array<Tag, count_types_with_journal<Args...>::value> get_tags(const Captured<Args>&... args);
+		static std::tuple<Captured<Args>...> capture(StrongObject<Args>&... args) {
+			return std::make_tuple<Captured<Args>...>(capture_do(args)...);
+		}
 
-#warning GOTO_TAGS
 		template<typename... Args>
-		static void goto_tags(const std::array<Tag, count_types_with_journal<Args...>::value>& tags, std::tuple<Captured<Args>...>& args);
+		static std::tuple<StrongObject<Args>&...> captured_get(std::tuple<Captured<Args>...>& args) {
+			return std::apply([](Captured<Args>&... a){return std::tuple<StrongObject<Args>&...>(([](auto& arg)->decltype(arg.object)&{if constexpr (std::remove_reference<decltype(arg)>::type::has_journal::value) {arg.object->journal.goto_tag(arg.tag);} return arg.object;}(a))...);}, args);
+		}
 
-#warning ADD_NEW_VERTEX
-		void add_new_vertex(std::function<void()> there, std::function<void()> back);
+		template<typename T>
+		static std::tuple<Tag> get_tags_do(const Captured<T, true>& a) {
+			return {a.tag};
+		}
+
+		template<typename T>
+		static std::tuple<> get_tags_do(const Captured<T, false>&) {
+			return {};
+		}
+
+		template<typename... Args>
+		static std::array<Tag, count_types_with_journal<Args...>::value> get_tags(const Captured<Args>&... args) {
+			return std::apply([](auto&&... args){return std::array<Tag, count_types_with_journal<Args...>::value>{std::forward<decltype(args)>(args)...};}, std::tuple_cat(get_tags_do(args)...));
+		}
+
+		template<size_t i, size_t j>
+		static void goto_tags_do(const std::array<Tag, j>&) {}
+
+		template<size_t i, size_t j, typename T, typename... Args>
+		static void goto_tags_do(const std::array<Tag, j>& tags, Captured<T, true>& arg, Captured<Args>&... args) {
+			arg.object->journal.goto_tag(tags[i]);
+			goto_tags_do<i + 1>(tags, args...);
+		}
+
+		template<size_t i, size_t j, typename T, typename... Args>
+		static void goto_tags_do(const std::array<Tag, j>& tags, Captured<T, false>&, Captured<Args>&... args) {
+			goto_tags_do<i>(tags, args...);
+		}
+
+		template<typename... Args>
+		static void goto_tags(const std::array<Tag, count_types_with_journal<Args...>::value>& tags, std::tuple<Captured<Args>...>& args) {
+			std::apply([&tags](auto&... a){goto_tags_do<0>(tags, a...);}, args);
+		}
+
+		void add_new_vertex(std::function<void()> there, std::function<void()> back) {
+			tag = tag.grow(std::move(there), std::move(back));
+		}
+
+		template<typename F>
+		std::function<void()> wrap_lambda(F&& lambda) {
+			return [f{std::make_shared<std::remove_reference_t<F>>(std::forward<F>(lambda))}](){(*f)();};
+		}
 	public:
+		Journal() : tag(Tag::make_new()) {}
 		template<typename O, typename R, std::enable_if_t<!std::is_same_v<R, void>, int> = 0, typename... Args>
 		R add_commit_noeffect(StrongObject<O> obj, std::tuple<R> (O::*basefun)(StrongObject<Args>...), StrongObject<Args>... args) {
 			Tag tag = get_tag();
@@ -406,7 +505,7 @@ namespace 🍆 {
 		template<typename O, typename R, std::enable_if_t<!std::is_same_v<R, void>, int> = 0, typename... Args>
 		void add_commit_dual(StrongObject<O> obj, R (O::*basefun)(StrongObject<Args>...), typename unpack_to_args<void, O, R>::type dualfun, StrongObject<Args>... args) {
 			auto there_args = capture(args...);
-			auto dual_args = std::apply([this](auto... args){return this->capture(args...);}, ((*obj).*basefun)(args...));
+			auto dual_args = std::apply([this](auto... args){return capture(args...);}, ((*obj).*basefun)(args...));
 			auto there = [there_args{std::move(there_args)}, obj, basefun]() mutable {
 				auto old_arg_tags = std::apply([](const auto&... a){return Journal::get_tags(a...);}, there_args);
 				std::apply([obj, basefun](auto... a)mutable{((*obj).*basefun)(a...);}, captured_get(there_args));
@@ -417,12 +516,12 @@ namespace 🍆 {
 				std::apply([obj, dualfun](auto... a)mutable{((*obj).*dualfun)(a...);}, captured_get(dual_args));
 				goto_tags(old_arg_tags, dual_args);
 			};
-			add_new_vertex(std::move(there), std::move(back));
+			add_new_vertex(wrap_lambda(std::move(there)), wrap_lambda(std::move(back)));
 		}
 
 		template<typename O, typename... Args>
 		void add_commit_dual(StrongObject<O> obj, void (O::*basefun)(StrongObject<Args>...), void (O::*dualfun)(), StrongObject<Args>... args) {
-			auto there_args = this->capture(args...);
+			auto there_args = capture(args...);
 			((*obj).*basefun)(args...);
 			auto there = [there_args{std::move(there_args)}, obj, basefun]() mutable {
 				auto old_arg_tags = std::apply([](const auto&... a){return Journal::get_tags(a...);}, there_args);
@@ -432,12 +531,12 @@ namespace 🍆 {
 			auto back = [obj, dualfun]() mutable {
 				((*obj).*dualfun)();
 			};
-			add_new_vertex(std::move(there), std::move(back));
+			add_new_vertex(wrap_lambda(std::move(there)), wrap_lambda(std::move(back)));
 		}
 
 		template<typename O, typename R, std::enable_if_t<!std::is_same_v<R, void>, int> = 0, typename... Args>
 		std::tuple_element_t<0, R> add_commit_dual(StrongObject<O> obj, R (O::*basefun)(StrongObject<Args>...), typename unpack_to_args_skip_first<void, O, R>::type dualfun, StrongObject<Args>... args) {
-			auto there_args = this->capture(args...);
+			auto there_args = capture(args...);
 			auto fun_ret = ((*obj).*basefun)(args...);
 			std::tuple_element_t<0, R> return_value = std::move(std::get<0>(fun_ret));
 			auto dual_args = std::apply([](auto... args){return capture(args...);}, trim_tuple(std::move(fun_ret)));
@@ -451,13 +550,13 @@ namespace 🍆 {
 				std::apply([obj, dualfun](auto... a)mutable{((*obj).*dualfun)(a...);}, captured_get(dual_args));
 				goto_tags(old_arg_tags, dual_args);
 			};
-			add_new_vertex(std::move(there), std::move(back));
+			add_new_vertex(wrap_lambda(std::move(there)), wrap_lambda(std::move(back)));
 			return return_value;
 		}
 
 		template<typename O, typename R, std::enable_if_t<!std::is_same_v<R, void>, int> = 0, typename... Args>
 		StrongObject<R> add_commit_dual(StrongObject<O> obj, std::tuple<StrongObject<R>> (O::*basefun)(StrongObject<Args>...), void (O::*dualfun)(), StrongObject<Args>... args) {
-			auto there_args = this->capture(args...);
+			auto there_args = capture(args...);
 			auto fun_ret = ((*obj).*basefun)(args...);
 			auto there = [there_args{std::move(there_args)}, obj, basefun]() mutable {
 				auto old_arg_tags = std::apply([](const auto&... a){return Journal::get_tags(a...);}, there_args);
@@ -467,7 +566,7 @@ namespace 🍆 {
 			auto back = [obj, dualfun]() mutable {
 				((*obj).*dualfun)();
 			};
-			add_new_vertex(std::move(there), std::move(back));
+			add_new_vertex(wrap_lambda(std::move(there)), wrap_lambda(std::move(back)));
 			return std::move(std::get<0>(fun_ret));
 		}
 	};

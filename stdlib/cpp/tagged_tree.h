@@ -30,7 +30,6 @@ public:
 			if(children.empty()) {
 				Vertex* current_vertex = this;
 				while(current_vertex && (!current_vertex->tagged) && current_vertex->children.empty()) {
-					int v = *current_vertex->data.value;
 					Vertex* current_parent = current_vertex->parent;
 					if(!current_parent) {
 						tree.root = nullptr;
@@ -47,6 +46,9 @@ public:
 					tree.root->parent = nullptr;
 				}
 			}
+		}
+		void tag() {
+			tagged = true;
 		}
 		std::pair<std::vector<const Vertex*>, std::vector<const Vertex*>> path_to(const Vertex& target) const {
 			const Vertex* first = this;
