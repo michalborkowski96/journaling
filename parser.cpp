@@ -186,12 +186,6 @@ namespace {
 				Expression expr = parse_ll_expression();
 				expression = std::make_unique<Cast>(begin, tokens[pos - 1].end, std::move(type), std::move(expr));
 			},
-			LexemeType::SNAPSHOT, [&]() {
-				++pos;
-				check_for_tokens(LexemeType::BRACKET_OPEN);
-				Expression expr = parse_ll_expression();
-				expression = std::make_unique<Snapshot>(begin, tokens[pos - 1].end, std::move(expr));
-			},
 			LexemeType::NIL, [&]() {
 				++pos;
 				expression = std::make_unique<Null>(begin, tokens[pos - 1].end);

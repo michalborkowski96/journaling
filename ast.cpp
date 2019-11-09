@@ -34,8 +34,6 @@ FunctionCall::FunctionCall(size_t begin, size_t end, Expression function, std::v
 
 Cast::Cast(size_t begin, size_t end, PointerType&& target_type, Expression value) : AstNode(begin, end), target_type(std::move(target_type)), value(std::move(value)) {}
 
-Snapshot::Snapshot(size_t begin, size_t end, Expression value) : AstNode(begin, end), value(std::move(value)) {}
-
 Negation::Negation(size_t begin, size_t end, Expression value, bool boolean) : AstNode(begin, end), value(std::move(value)), boolean(boolean) {}
 
 BinaryOperation::BinaryOperation(size_t begin, size_t end, Expression left, Expression right, BinaryOperationType type) : AstNode(begin, end), left(std::move(left)), right(std::move(right)), type(type) {}

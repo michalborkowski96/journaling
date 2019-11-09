@@ -187,11 +187,6 @@ public:
 			print_expression(e->value, parameters);
 			print_data(")");
 		},
-		[&](const std::unique_ptr<Snapshot>& e){
-			print_data(u8"🍆::snapshot(");
-			print_expression(e->value, parameters);
-			print_data(")");
-		},
 		[&](const std::unique_ptr<Null>&){
 			print_data(u8"🍆::null");
 		},
@@ -204,28 +199,20 @@ public:
 		},
 		[&](const std::unique_ptr<FunctionCall>& e){
 			if(e->lazy) {
-				print_data(u8"🍆::lazy_call([");
+				print_data(u8"🍆::lazy_call(");
 
 				std::visit(overload([&](const std::unique_ptr<Identifier>&) {
-					print_data(u8"obj_ptr{🍆::capture(get_this())}");
+					print_data("get_this()");
 				},
 				[&](const std::unique_ptr<MemberAccess>& ee) {
-					print_data(u8"obj_ptr{🍆::capture");
 					print_expression(ee->object, parameters);
-					print_data("}");
 				},
 				[&](const auto&) {
 					throw std::runtime_error("Internal error.");
 				}
 				), e->function);
 
-				for(size_t i = 0; i < e->arguments.size(); ++i) {
-					print_data(", _arg", i, u8"{🍆::capture");
-					print_expression(e->arguments[i].first, parameters);
-					print_data("}");
-				}
-
-				print_data("]() mutable {return obj_ptr->");
+				print_data(", [](auto obj_ptr, auto... args) {return obj_ptr->");
 				std::visit(overload([&](const std::unique_ptr<Identifier>& ee) {
 					print_data("privfun_", *ee);
 				},
@@ -236,15 +223,14 @@ public:
 					throw std::runtime_error("Internal error.");
 				}
 				), e->function);
+				print_data("(args...);}");
 
-				print_data('(');
-				if(!e->arguments.empty()) {
-					print_data("_arg0");
-					for(size_t i = 1; i < e->arguments.size(); ++i) {
-						print_data(", _arg", i);
-					}
+				for(size_t i = 0; i < e->arguments.size(); ++i) {
+					print_data(", ");
+					print_expression(e->arguments[i].first, parameters);
 				}
-				print_data(");}");
+
+				print_data(")");
 			} else {
 				std::visit(overload([&](const std::unique_ptr<Identifier>& ee) {
 					print_data("privfun_", *ee);

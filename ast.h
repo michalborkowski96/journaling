@@ -62,8 +62,6 @@ namespace ast {
 
 		struct Cast;
 
-		struct Snapshot;
-
 		struct Null;
 
 		struct This;
@@ -74,7 +72,7 @@ namespace ast {
 
 		struct New;
 
-		using Expression = Wrap<std::variant, std::unique_ptr, StringLiteral, IntegerLiteral, Identifier, New, Negation, Cast, Snapshot, Null, This, MemberAccess, FunctionCall, BinaryOperation>;
+		using Expression = Wrap<std::variant, std::unique_ptr, StringLiteral, IntegerLiteral, Identifier, New, Negation, Cast, Null, This, MemberAccess, FunctionCall, BinaryOperation>;
 
 		struct StringLiteral : public AstNode {
 			std::string value;
@@ -117,11 +115,6 @@ namespace ast {
 			PointerType target_type;
 			Expression value;
 			Cast(size_t begin, size_t end, PointerType&& target_type, Expression value);
-		};
-
-		struct Snapshot : public AstNode {
-			Expression value;
-			Snapshot(size_t begin, size_t end, Expression value);
 		};
 
 		struct Negation : public AstNode {

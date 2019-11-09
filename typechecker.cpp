@@ -121,15 +121,6 @@ bool RealFunctionInfo::forbids_call_nojournal_marks() const {
 bool TypeInfo::extendable() const {
 	return false;
 }
-bool TypeInfo::snapshot_possible() const {
-	return true;
-}
-bool VoidTypeInfo::snapshot_possible() const {
-	return false;
-}
-bool RealClassInfo::snapshot_possible() const {
-	return !ast_data->nojournal;
-}
 std::optional<const TypeInfo*> TypeInfo::get_superclass() const {
 	return std::nullopt;
 }
@@ -333,9 +324,6 @@ public:
 	FunctionalTypeInfo(const FunctionInfo* fi) : fi(fi) {}
 	virtual bool check_nojournal_mark(bool) const override {
 		return true;
-	}
-	virtual bool snapshot_possible() const override {
-		return false;
 	}
 	virtual bool implicitly_convertible_to(const TypeInfo* o) const override {
 		return o->implicitly_convertible_from(this);
@@ -1079,17 +1067,6 @@ std::optional<ExpressionCheckResult> check_expression(std::vector<TypeError>& er
 			return std::nullopt;
 		}
 		return ExpressionCheckResult(tt, false);
-	},
-	[&](const std::unique_ptr<Snapshot>& e)->std::optional<ExpressionCheckResult>{
-		auto et = check_expr(e->value);
-		if(!et) {
-			return std::nullopt;
-		}
-		if(!et->type_info()->snapshot_possible()) {
-			errors.emplace_back(*e, "Snapshot of type " + et->type_info()->full_name() + " not possible.");
-			return std::nullopt;
-		}
-		return ExpressionCheckResult(et->type_info(), false);
 	},
 	[&](const std::unique_ptr<Null>&)->std::optional<ExpressionCheckResult>{
 		return ExpressionCheckResult(class_database.get_for_null(), false);
