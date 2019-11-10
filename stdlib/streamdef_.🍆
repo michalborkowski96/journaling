@@ -1,5 +1,4 @@
 import "string.🍆"
-import "simple_list_.🍆"
 
 abstract nojournal OutputStream {
 	constructor(){};
