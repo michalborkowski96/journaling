@@ -3,12 +3,14 @@ import "streamdef_.🍆"
 nojournal StdOut : OutputStream {
 	constructor()(){};
 	fun void print_string(String s) {};
+	fun void print_int(int i) {};
 	fun void flush() {};
 }
 
 nojournal StdErr : OutputStream {
 	constructor()(){};
 	fun void print_string(String s) {};
+	fun void print_int(int i) {};
 	fun void flush() {};
 }
 

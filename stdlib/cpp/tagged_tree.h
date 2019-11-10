@@ -25,6 +25,9 @@ public:
 		Vertex* grow(T data) {
 			return children.emplace(children.size(), std::unique_ptr<Vertex>(new Vertex(depth + 1, this, children.size(), std::move(data), true))).first->second.get();
 		}
+		Vertex* get_parent() {
+			return parent;
+		}
 		void untag(TaggedTree& tree){
 			tagged = false;
 			if(children.empty()) {
@@ -50,11 +53,11 @@ public:
 		void tag() {
 			tagged = true;
 		}
-		std::pair<std::vector<const Vertex*>, std::vector<const Vertex*>> path_to(const Vertex& target) const {
-			const Vertex* first = this;
-			const Vertex* second = &target;
-			std::vector<const Vertex*> this_path;
-			std::vector<const Vertex*> that_path;
+		std::pair<std::vector<Vertex*>, std::vector<Vertex*>> path_to(Vertex& target) {
+			Vertex* first = this;
+			Vertex* second = &target;
+			std::vector<Vertex*> this_path;
+			std::vector<Vertex*> that_path;
 			while(first->depth > second->depth) {
 				this_path.push_back(first);
 				first = first->parent;

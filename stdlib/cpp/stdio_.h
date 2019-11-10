@@ -27,6 +27,15 @@ public: \
 	virtual void fun_print_string(🍆::StrongObject<Type_String> var_s) { \
 		(basefun_print_string(var_s)); \
 	} \
+	auto basefun_print_int(🍆::StrongObject<🍆::Integer> var_i) { \
+		std::cout << var_i->to_ll(); \
+	} \
+	virtual void privfun_print_int(🍆::StrongObject<🍆::Integer> var_i) { \
+		(basefun_print_int(var_i)); \
+	} \
+	virtual void fun_print_int(🍆::StrongObject<🍆::Integer> var_i) { \
+		(basefun_print_int(var_i)); \
+	} \
 };
 
 #define 🍆_Default_StdErr \
@@ -55,6 +64,15 @@ public: \
 	} \
 	virtual void fun_print_string(🍆::StrongObject<Type_String> var_s) { \
 		(basefun_print_string(var_s)); \
+	} \
+	auto basefun_print_int(🍆::StrongObject<🍆::Integer> var_i) { \
+		std::cerr << var_i->to_ll(); \
+	} \
+	virtual void privfun_print_int(🍆::StrongObject<🍆::Integer> var_i) { \
+		(basefun_print_int(var_i)); \
+	} \
+	virtual void fun_print_int(🍆::StrongObject<🍆::Integer> var_i) { \
+		(basefun_print_int(var_i)); \
 	} \
 };
 

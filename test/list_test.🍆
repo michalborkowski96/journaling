@@ -4,10 +4,13 @@ import "../stdlib/list.🍆"
 struct Main {
 	constructor(){};
 	fun void main(){
+		auto out = new StdOut();
 		var List<Integer> ints = new List<Integer>();
 		for(var int i = 0; i < 10; i = i + 1) {
 			ints.push_back(new Integer(i));
 		}
-		ints.print(:new StdOut());
+		out.print_int_ln(ints.size());
+		ints.print(:out);
+		out.print_newline();
 	};
 }

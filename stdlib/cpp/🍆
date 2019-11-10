@@ -327,14 +327,27 @@ namespace 🍆 {
 		};
 
 		class Tag {
+			using VertexType = TaggedTree<std::tuple<std::function<void()>, std::function<void()>, size_t>>::Vertex;
 			std::shared_ptr<TaggedTree<std::tuple<std::function<void()>, std::function<void()>, size_t>>> tree;
-			TaggedTree<std::tuple<std::function<void()>, std::function<void()>, size_t>>::Vertex* vertex;
+			VertexType* vertex;
 			Tag(decltype(tree) tree, decltype(vertex) vertex) : tree(std::move(tree)), vertex(vertex) {}
 			void destroy(){
 				if(tree && ((--std::get<2>(vertex->data)) == 0)) {
 					vertex->untag(*tree);
 					tree = nullptr;
 				}
+			}
+			friend class Journal;
+			std::pair<std::vector<Tag::VertexType*>, std::vector<Tag::VertexType*>> path_to(const Tag& t) const {
+				return vertex->path_to(*t.vertex);
+			}
+			void force_vertex(VertexType* v) {
+				++std::get<2>(v->data);
+				v->tag();
+				if((--std::get<2>(vertex->data)) == 0) {
+					vertex->untag(*tree);
+				}
+				vertex = v;
 			}
 		public:
 			Tag() = delete;
@@ -376,8 +389,22 @@ namespace 🍆 {
 		void force_tag(const Tag& t) {
 			tag = t;
 		}
-#warning GOTO_TAG
-		void goto_tag(const Tag&);
+		void force_tag(Tag::VertexType* v) {
+			tag.force_vertex(v);
+		}
+		
+		void goto_tag(const Tag& t) {
+			std::pair<std::vector<Tag::VertexType*>, std::vector<Tag::VertexType*>> path = tag.path_to(t);
+			path.first.pop_back();
+			for(Tag::VertexType* v : path.first) {
+				std::get<1>(v->data)();
+				force_tag(v->get_parent());
+			}
+			for(auto i = path.second.rbegin(); i != path.second.rend(); ++i) {
+				std::get<0>((**i).data)();
+				force_tag(*i);
+			}
+		}
 
 		template<typename...>
 		struct count_types_with_journal;

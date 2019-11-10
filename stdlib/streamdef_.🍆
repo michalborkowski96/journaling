@@ -4,27 +4,7 @@ import "simple_list_.🍆"
 abstract nojournal OutputStream {
 	constructor(){};
 	fun void print_string(String s);
-	fun void print_int(int i) {
-		if(!i) {
-			print_string("0");
-			return;
-		}
-		if(i < 0) {
-			print_string("-");
-			i = -i;
-		}
-		var SimpleList_<int> digits;
-		while(i) {
-			digits.insert(digits.end(), i % 10);
-			i = i / 10;
-		}
-		auto d = digits.end().prev();
-		while(d.neq(digits.begin())) {
-			print_digit(d.deref());
-			d = d.prev();
-		}
-		print_digit(d.deref());
-	};
+	fun void print_int(int i);
 	fun void print_string_ln(String s) {
 		print_string(s);
 		print_newline();
@@ -36,11 +16,6 @@ abstract nojournal OutputStream {
 	fun void print_newline() {
 		print_string("
 ");
-	};
-	fun void print_digit(int i) {
-		var String s = new String();
-		s.resize(1, i - '0');
-		print_string(s);
 	};
 	fun void flush();
 }
