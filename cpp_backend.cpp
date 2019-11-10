@@ -85,17 +85,6 @@ public:
 		), t);
 	}
 
-	/*void print_type(const Type& t, const std::map<std::string, const TypeInfo*>& parameters) {
-		return std::visit(overload(
-		[&](const VoidType&){
-			o << "void";
-		},
-		[&](const VariableType& vt){
-			print_type(vt, parameters);
-		}
-		), t);
-	}NIE UŻYWAĆ, BO BĘDZIE STRONG_OBJECT<VOID>*/
-
 	void print_owned_type(const VariableType& type, const std::map<std::string, const TypeInfo*>& parameters) {
 		print_data(u8"🍆::StrongObject<");
 		print_type(type, parameters);
