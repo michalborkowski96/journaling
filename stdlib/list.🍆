@@ -1,15 +1,39 @@
 import "container.🍆"
 import "list_element_.🍆"
+import "simple_list_.🍆"
 
 List T : OrderedContainer<T, ListElement_<T>> {
 	int size_;
 	strong ListElement_<T> begin_;
 	strong ListElement_<T> end_;
+	strong SimpleList_<ListElement_<T>> iterators_;
 
 	constructor()(){
 		end_ = new ListElement_<T>(null, null, null);
 		begin_ = end_;
+		iterators_ = new SimpleList_<ListElement_<T>>();
 	};
+
+	fun ListElement_<T> get_new_iterator_(T el, ListElement_<T> next, ListElement_<T> prev){
+		if(iterators_.size() == 0) {
+			return new ListElement_<T>(el, next, prev);
+		} else {
+			auto i = iterators_.end().prev();
+			iterators_.erase(i);
+			auto iter = i.deref();
+			iter.next_ = next;
+			iter.prev_ = prev;
+			iter.element_ = el;
+			return iter;
+		}
+	} noeffect;
+
+	fun void retire_iterator_(ListElement_<T> i){
+		i.next_ = null;
+		i.prev_ = null;
+		i.element_ = null;
+		iterators_.insert(iterators_.end(), i);
+	} noeffect;
 
 	fun ListElement_<T> begin() {
 		return begin_;
@@ -25,7 +49,7 @@ List T : OrderedContainer<T, ListElement_<T>> {
 
 	fun ListElement_<T> insert(ListElement_<T> iter, T element) {
 		size_ = size_ + 1;
-		var ListElement_<T> n = new ListElement_<T>(element, iter, iter.prev_);
+		var ListElement_<T> n = get_new_iterator_(element, iter, iter.prev_);
 		iter.prev_ = n;
 		if(iter.eq(begin_)) {
 			begin_ = n;
@@ -43,7 +67,10 @@ List T : OrderedContainer<T, ListElement_<T>> {
 		} else {
 			begin_ = iter.next_;
 		}
-		return iter.next_, iter.next_, iter.element_;
+		auto n = iter.next_;
+		auto e = iter.element_;
+		retire_iterator_(iter);
+		return n, n, e;
 	} dual;
 }
 

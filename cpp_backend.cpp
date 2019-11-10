@@ -1,8 +1,6 @@
 #include "typechecker.h"
 #include "system.h"
 
-#include <ostream>
-
 using namespace ast;
 using namespace expression;
 using namespace statement;
@@ -711,9 +709,11 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 						case FunctionKind::NOEFFECT:
 							dual = false;
 							break;
+						case FunctionKind::AUTO:
+							dual = false;
+							break;
 						default:
 							throw std::runtime_error("Internal error.");
-							break;
 						}
 					}
 
@@ -733,7 +733,18 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 						}
 						output.print_data("));");
 					} else {
-						output.print_data("return journal.add_commit_", dual ? "dual" : "noeffect", "(");
+						output.print_data("return journal.add_commit_", [&](){
+							switch(*f.declaration_ast->kind) {
+							case FunctionKind::DUAL:
+								return "dual";
+							case FunctionKind::NOEFFECT:
+								return "noeffect";
+							case FunctionKind::AUTO:
+								return "auto";
+							default:
+								throw std::runtime_error("Internal error.");
+							}
+						}(), "(");
 						output.print_data("get_this(), &");
 						output.print_type(c_);
 						output.print_data("::basefun_", f.name);

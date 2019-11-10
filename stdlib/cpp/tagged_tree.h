@@ -28,6 +28,9 @@ public:
 		Vertex* get_parent() {
 			return parent;
 		}
+		size_t children_count() const {
+			return children.size();
+		}
 		void untag(TaggedTree& tree){
 			tagged = false;
 			if(children.empty()) {

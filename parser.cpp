@@ -520,6 +520,7 @@ namespace {
 			std::optional<std::pair<std::vector<std::pair<VariableType, Identifier>>, std::unique_ptr<Block>>> dual;
 
 			expect(LexemeType::NOEFFECT, [&](){kind = FunctionKind::NOEFFECT; ++pos;},
+				LexemeType::AUTO, [&](){kind = FunctionKind::AUTO; ++pos;},
 				LexemeType::DUAL, [&](){
 					kind = FunctionKind::DUAL;
 					++pos;

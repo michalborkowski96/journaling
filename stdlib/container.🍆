@@ -107,19 +107,19 @@ abstract OrderedContainer Element Iterator : Container<Element, Iterator> {
 
 	fun void push_back(Element e) {
 		this.insert(:end(), e);
-	} dual (){};
+	} auto;
 
 	fun void pop_back() {
 		this.erase(:end().prev());
-	} dual (){};
+	} auto;
 
 	fun void push_front(Element e) {
 		this.insert(:begin(), e);
-	} dual (){};
+	} auto;
 
 	fun void pop_front() {
 		this.erase(:begin());
-	} dual (){};
+	} auto;
 
 	fun void resize(int new_size, Element el) {
 		while(size() < new_size) {
@@ -128,7 +128,7 @@ abstract OrderedContainer Element Iterator : Container<Element, Iterator> {
 		while(size() > new_size) {
 			this.pop_back();
 		}
-	} dual(){};
+	} auto;
 
 	fun void sort(Comparator<Element> comp) {
 		for(var Iterator e1 = begin(); !e1.eq(end()); e1 = e1.next()) {
@@ -145,5 +145,5 @@ abstract OrderedContainer Element Iterator : Container<Element, Iterator> {
 				}
 			}
 		}
-	} dual(){};
+	} auto;
 }

@@ -9,6 +9,9 @@
 #include <type_traits>
 #include <tuple>
 
+#warning iostream
+#include <iostream>
+
 namespace 🍆 {
 	template <typename... Fs>
 	struct overload : std::remove_reference_t<Fs>... {
@@ -27,14 +30,14 @@ namespace 🍆 {
 
 	template<>
 	class StrongObject<Integer> {
-		std::variant<long long, std::shared_ptr<std::function<StrongObject<Integer>()>>> value;
+		std::shared_ptr<std::variant<long long, std::unique_ptr<std::function<StrongObject<Integer>()>>>> value;
 	public:
 		using object_type = Integer;
 		StrongObject<Integer>();
 		StrongObject<Integer>(const Null&);
 		StrongObject<Integer>(Integer value);
 		StrongObject<Integer>(long long value);
-		StrongObject<Integer>(std::shared_ptr<std::function<StrongObject<Integer>()>> fun) : value(std::move(fun)) {}
+		StrongObject<Integer>(std::unique_ptr<std::function<StrongObject<Integer>()>> fun) : value(std::make_shared<std::variant<long long, std::unique_ptr<std::function<StrongObject<Integer>()>>>>(std::move(fun))) {}
 
 		Integer& operator*();
 		Integer* operator->();
@@ -46,15 +49,15 @@ namespace 🍆 {
 		long long& get_value() {
 			return std::visit(overload(
 			[](long long& v)->long long&{return v;},
-			[&](std::shared_ptr<std::function<StrongObject<Integer>()>>& f)->long long&{
+			[&](std::unique_ptr<std::function<StrongObject<Integer>()>>& f)->long long&{
 				long long val = (*f)().get_value();
 				*f = [=](){
-					return StrongObject<Integer>(val);
+					return val;
 				};
-				value = val;
-				return std::get<long long>(value);
+				*value = val;
+				return std::get<long long>(*value);
 			}
-			), value);
+			), *value);
 		}
 
 		friend class Integer;
@@ -103,34 +106,23 @@ namespace 🍆 {
 		StrongObject<Integer> fun_con(StrongObject<Integer> o) const {
 			return StrongObject<Integer>(value && o.get_value());
 		}
-/*
-		StrongObject<Integer> operator==(StrongObject<Integer> b) const {
-			return StrongObject<Integer>(value == b.get_value());
-		}
-		StrongObject<Integer> operator!=(StrongObject<Integer> b) const {
-			return StrongObject<Integer>(value != b.get_value());
-		}
-*/
+
 		static Integer* cast_from(long long* value) {
 			return reinterpret_cast<Integer*>(value);
 		}
-/*
-		explicit operator bool() const {
-			return value;
-		}
-*/
+
 		long long& to_ll() {
 			return value;
 		}
 	};
 
-	StrongObject<Integer>::StrongObject() : value(0LL) {}
+	StrongObject<Integer>::StrongObject() : value(std::make_shared<decltype(value)::element_type>(0LL)) {}
 
-	StrongObject<Integer>::StrongObject(const Null&) : value(0LL) {}
+	StrongObject<Integer>::StrongObject(const Null&) :  value(std::make_shared<decltype(value)::element_type>(0LL)) {}
 
-	StrongObject<Integer>::StrongObject(Integer value) : value(value.to_ll()) {}
+	StrongObject<Integer>::StrongObject(Integer v) :  value(std::make_shared<decltype(value)::element_type>(v.to_ll())) {}
 
-	StrongObject<Integer>::StrongObject(long long value) : value(value) {}
+	StrongObject<Integer>::StrongObject(long long v) :  value(std::make_shared<decltype(value)::element_type>(v)) {}
 
 	Integer& StrongObject<Integer>::operator*() {
 		return *Integer::cast_from(&get_value());
@@ -141,18 +133,18 @@ namespace 🍆 {
 	StrongObject<Integer> StrongObject<Integer>::operator==(StrongObject<Integer> b) {
 		return std::visit(overload(
 		[&](long long& v){return v == b.get_value();},
-		[&](std::shared_ptr<std::function<StrongObject<Integer>()>>& fa){
+		[&](std::unique_ptr<std::function<StrongObject<Integer>()>>& fa){
 			return std::visit(overload(
 			[&](long long& v){return v == get_value();},
-			[&](std::shared_ptr<std::function<StrongObject<Integer>()>>& fb){
+			[&](std::unique_ptr<std::function<StrongObject<Integer>()>>& fb){
 				if(fa == fb) {
 					return true;
 				}
 				return get_value() == b.get_value();
 			}
-			), b.value);
+			), *b.value);
 		}
-		), value);
+		), *value);
 	}
 	StrongObject<Integer> StrongObject<Integer>::operator!=(StrongObject<Integer> b) {
 		return !(*this == b);
@@ -162,29 +154,101 @@ namespace 🍆 {
 		return get_value();
 	}
 
+	class WeakObjectImpl;
+
+	class StrongObjectImpl {
+		template<typename U>
+		friend class StrongObject;
+		friend class WeakObjectImpl;
+		static const std::shared_ptr<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>> null_ptr_var;
+		std::shared_ptr<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>> obj;
+	public:
+		StrongObjectImpl(const Null&) : obj(null_ptr_var) {}
+		StrongObjectImpl() : obj(null_ptr_var) {}
+		StrongObjectImpl(const WeakObjectImpl& o);
+		StrongObjectImpl(std::unique_ptr<std::function<StrongObjectImpl()>> o) : obj(std::make_shared<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>>(std::move(o))) {}
+
+		StrongObject<Integer> operator==(StrongObjectImpl b) {
+			return std::visit(overload(
+			[&](std::shared_ptr<void>& v){return v == b.get_value();},
+			[&](std::unique_ptr<std::function<StrongObjectImpl()>>& fa){
+				return std::visit(overload(
+				[&](std::shared_ptr<void>& v){return v == get_value();},
+				[&](std::unique_ptr<std::function<StrongObjectImpl()>>& fb){
+					if(fa == fb) {
+						return true;
+					}
+					return get_value() == b.get_value();
+				}
+				), *b.obj);
+			}
+			), *obj);
+		}
+		StrongObject<Integer> operator!=(StrongObjectImpl b) {
+			return !(*this == b);
+		}
+
+		std::shared_ptr<void> get_value() {
+			return std::visit(overload(
+			[](std::shared_ptr<void> v){return v;},
+			[&](std::unique_ptr<std::function<StrongObjectImpl()>>& f){
+				StrongObjectImpl val = (*f)();
+				std::shared_ptr<void> v = val.get_value();
+				*obj = v;
+				return v;
+			}
+			), *obj);
+		}
+	};
+
+	const std::shared_ptr<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>> StrongObjectImpl::null_ptr_var = std::make_shared<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>>(std::shared_ptr<void>(nullptr));
+
+	class WeakObjectImpl {
+		template<typename U>
+		friend class WeakObject;
+		friend class StrongObjectImpl;
+		std::weak_ptr<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>> obj;
+	public:
+		WeakObjectImpl(const Null&) : obj(StrongObjectImpl::null_ptr_var) {}
+		WeakObjectImpl() : obj(StrongObjectImpl::null_ptr_var) {}
+		WeakObjectImpl(const StrongObjectImpl& o) : obj(o.obj) {}
+
+		StrongObject<Integer> operator==(StrongObjectImpl b) {
+			return StrongObjectImpl(*this) == b;
+		}
+		StrongObject<Integer> operator!=(StrongObjectImpl b) {
+			return !(*this == b);
+		}
+
+		std::shared_ptr<void> get_value() {
+			auto s = StrongObjectImpl(*this);
+			return s.get_value();
+		}
+	};
+
+	StrongObjectImpl::StrongObjectImpl(const WeakObjectImpl& o) : obj(o.obj) {}
+
 	template<typename T>
 	class WeakObject;
 
-	const std::shared_ptr<std::function<std::shared_ptr<void>()>> null_ptr_fun = std::make_shared<std::function<std::shared_ptr<void>()>>([]()->std::shared_ptr<void>{return nullptr;});
-
 	template<typename T>
 	class StrongObject {
-		std::shared_ptr<std::function<std::shared_ptr<void>()>> obj;
+		StrongObjectImpl obj;
 		friend class WeakObject<T>;
 		template<typename U>
 		friend class StrongObject;
 	public:
 		using object_type = T;
 		T& operator*() {
-			return *get_value();
+			return *std::static_pointer_cast<T>(obj.get_value());
 		}
 		T* operator->() {
-			return get_value().get();
+			return std::static_pointer_cast<T>(obj.get_value()).get();
 		}
-		StrongObject(const Null&) : obj(null_ptr_fun) {}
-		StrongObject() : obj(null_ptr_fun) {}
+		StrongObject(const Null&) {}
+		StrongObject() = default;
 		StrongObject(const WeakObject<T>& o);
-		StrongObject(std::shared_ptr<std::function<std::shared_ptr<void>()>> fun) : obj(std::move(fun)) {}
+		StrongObject(StrongObjectImpl o) : obj(std::move(o)) {}
 		template<typename U, std::enable_if_t<std::is_convertible<U*, T*>::value, int> = 0>
 		StrongObject(StrongObject<U> o) : obj(o.obj) {}
 
@@ -195,7 +259,7 @@ namespace 🍆 {
 			std::shared_ptr<T> ptr(reinterpret_cast<T*>(memory), std::function<void(T*)>([](T* ptr){
 				delete[](reinterpret_cast<char*>(ptr));
 			}));
-			ret.obj = std::make_shared<std::function<std::shared_ptr<void>()>>([=]()->std::shared_ptr<void>{return ptr;});
+			ret.obj.obj = std::make_shared<typename decltype(ret.obj.obj)::element_type>(ptr);
 			new (reinterpret_cast<T*>(memory)) T(ret, std::forward<Ts>(args)...);
 			*std::get_deleter<std::function<void(T*)>>(ptr) = [](T* ptr){
 				ptr->~T();
@@ -204,26 +268,15 @@ namespace 🍆 {
 			return ret;
 		}
 
-		StrongObject<Integer> operator==(StrongObject<T> b) {
-			if(obj == b.obj) {
-				return true;
-			}
-			return get_value() == b.get_value();
+		StrongObject<Integer> operator==(const StrongObject<T>& b) {
+			return obj == b.obj;
 		}
-		StrongObject<Integer> operator!=(StrongObject<T> b) {
+		StrongObject<Integer> operator!=(const StrongObject<T>& b) {
 			return !(*this == b);
 		}
-/*
-		explicit operator bool() const {
-			return obj;
-		}
-*/
+
 		std::shared_ptr<T> get_value() {
-			std::shared_ptr<T> val = std::static_pointer_cast<T>((*obj)());
-			*obj = [=](){
-				return val;
-			};
-			return val;
+			return std::static_pointer_cast<T>(obj.get_value());
 		}
 
 		template<typename U>
@@ -237,13 +290,20 @@ namespace 🍆 {
 			if(!value) {
 				return null;
 			}
-			return std::make_shared<std::function<std::shared_ptr<void>()>>([val{std::dynamic_pointer_cast<T>(value)}](){return val;});
+			std::shared_ptr<T> c = std::dynamic_pointer_cast<T>(value);
+			if(!c) {
+				return null;
+			}
+			return c;
+		}
+		operator StrongObjectImpl() const {
+			return obj;
 		}
 	};
 
 	template<typename T>
 	class WeakObject {
-		std::weak_ptr<std::function<std::shared_ptr<void>()>> obj;
+		WeakObjectImpl obj;
 		friend class StrongObject<T>;
 		template<typename U>
 		friend class WeakObject;
@@ -255,30 +315,21 @@ namespace 🍆 {
 		T* operator->() {
 			return get_value().get();
 		}
-		WeakObject(const Null&) : obj(null_ptr_fun) {}
-		WeakObject(std::weak_ptr<std::function<std::shared_ptr<T>()>> obj) : obj(obj) {}
-		WeakObject() : obj(null_ptr_fun) {}
+		WeakObject(const Null&) {}
+		WeakObject(WeakObjectImpl obj) : obj(obj) {}
+		WeakObject() {}
 		WeakObject(const StrongObject<T>& o) : obj(o.obj) {}
 		template<typename U, std::enable_if_t<std::is_convertible<U*, T*>::value, int> = 0>
 		WeakObject(WeakObject<U> o) : obj(o.obj) {}
-		StrongObject<Integer> operator==(WeakObject<T> b) {
-			return StrongObject<T>(*this) == StrongObject<T>(b);
+		StrongObject<Integer> operator==(StrongObject<T> b) {
+			return StrongObject<T>(*this) == b;
 		}
-		StrongObject<Integer> operator!=(WeakObject<T> b) {
+		StrongObject<Integer> operator!=(StrongObject<T> b) {
 			return !(*this == b);
 		}
-/*
-		explicit operator bool() const {
-			return obj;
-		}
-*/
+
 		std::shared_ptr<T> get_value() {
-			auto locked = obj.lock();
-			std::shared_ptr<T> val = std::static_pointer_cast<T>((*locked)());
-			*locked = [=](){
-				return val;
-			};
-			return val;
+			return std::static_pointer_cast<T>(obj.get_value());
 		}
 	};
 
@@ -286,7 +337,7 @@ namespace 🍆 {
 	class WeakObject<Integer>;
 
 	template<typename T>
-	StrongObject<T>::StrongObject(const WeakObject<T>& o) : obj(o.obj.lock()) {}
+	StrongObject<T>::StrongObject(const WeakObject<T>& o) : obj(o.obj) {}
 
 	template<typename T, typename... Ts>
 	StrongObject<T> make_object(Ts&&... args) {
@@ -400,9 +451,9 @@ namespace 🍆 {
 				std::get<1>(v->data)();
 				force_tag(v->get_parent());
 			}
-			for(auto i = path.second.rbegin(); i != path.second.rend(); ++i) {
-				std::get<0>((**i).data)();
-				force_tag(*i);
+			for(Tag::VertexType* v : path.second) {
+				std::get<0>(v->data)();
+				force_tag(v);
 			}
 		}
 
@@ -471,17 +522,17 @@ namespace 🍆 {
 		}
 
 		template<typename T>
-		static std::tuple<Tag> get_tags_do(const Captured<T, true>& a) {
-			return {a.tag};
+		static std::tuple<Tag> get_tags_do(Captured<T, true>& a) {
+			return {a.object->journal.tag};
 		}
 
 		template<typename T>
-		static std::tuple<> get_tags_do(const Captured<T, false>&) {
+		static std::tuple<> get_tags_do(Captured<T, false>&) {
 			return {};
 		}
 
 		template<typename... Args>
-		static std::array<Tag, count_types_with_journal<Args...>::value> get_tags(const Captured<Args>&... args) {
+		static std::array<Tag, count_types_with_journal<Args...>::value> get_tags(Captured<Args>&... args) {
 			return std::apply([](auto&&... args){return std::array<Tag, count_types_with_journal<Args...>::value>{std::forward<decltype(args)>(args)...};}, std::tuple_cat(get_tags_do(args)...));
 		}
 
@@ -509,8 +560,8 @@ namespace 🍆 {
 		}
 
 		template<typename F>
-		std::function<void()> wrap_lambda(F&& lambda) {
-			return [f{std::make_shared<std::remove_reference_t<F>>(std::forward<F>(lambda))}](){(*f)();};
+		static std::function<std::invoke_result_t<F>()> wrap_lambda(F&& lambda) {
+			return [f{std::make_shared<std::remove_cv_t<F>>(std::forward<F>(lambda))}](){return (*f)();};
 		}
 	public:
 		Journal() : tag(Tag::make_new()) {}
@@ -530,17 +581,27 @@ namespace 🍆 {
 		}
 
 		template<typename O, typename R, std::enable_if_t<!std::is_same_v<R, void>, int> = 0, typename... Args>
+		R add_commit_auto(StrongObject<O> obj, std::tuple<R> (O::*basefun)(StrongObject<Args>...), StrongObject<Args>... args) {
+			return std::get<0>(((*obj).*basefun)(args...));
+		}
+
+		template<typename O, typename... Args>
+		void add_commit_auto(StrongObject<O> obj, void (O::*basefun)(StrongObject<Args>...), StrongObject<Args>... args) {
+			((*obj).*basefun)(args...);
+		}
+
+		template<typename O, typename R, std::enable_if_t<!std::is_same_v<R, void>, int> = 0, typename... Args>
 		void add_commit_dual(StrongObject<O> obj, R (O::*basefun)(StrongObject<Args>...), typename unpack_to_args<void, O, R>::type dualfun, StrongObject<Args>... args) {
 			auto there_args = capture(args...);
 			auto dual_args = std::apply([this](auto... args){return capture(args...);}, ((*obj).*basefun)(args...));
 			auto there = [there_args{std::move(there_args)}, obj, basefun]() mutable {
-				auto old_arg_tags = std::apply([](const auto&... a){return Journal::get_tags(a...);}, there_args);
-				std::apply([obj, basefun](auto... a)mutable{((*obj).*basefun)(a...);}, captured_get(there_args));
+				auto old_arg_tags = std::apply([](const auto&... a){return get_tags(a...);}, there_args);
+				std::apply([obj, basefun](auto&... a)mutable{((*obj).*basefun)(a...);}, captured_get(there_args));
 				goto_tags(old_arg_tags, there_args);
 			};
 			auto back = [dual_args{std::move(dual_args)}, obj, dualfun]() mutable {
-				auto old_arg_tags = std::apply([](const auto&... a){return Journal::get_tags(a...);}, dual_args);
-				std::apply([obj, dualfun](auto... a)mutable{((*obj).*dualfun)(a...);}, captured_get(dual_args));
+				auto old_arg_tags = std::apply([](const auto&... a){return get_tags(a...);}, dual_args);
+				std::apply([obj, dualfun](auto&... a)mutable{((*obj).*dualfun)(a...);}, captured_get(dual_args));
 				goto_tags(old_arg_tags, dual_args);
 			};
 			add_new_vertex(wrap_lambda(std::move(there)), wrap_lambda(std::move(back)));
@@ -551,8 +612,8 @@ namespace 🍆 {
 			auto there_args = capture(args...);
 			((*obj).*basefun)(args...);
 			auto there = [there_args{std::move(there_args)}, obj, basefun]() mutable {
-				auto old_arg_tags = std::apply([](const auto&... a){return Journal::get_tags(a...);}, there_args);
-				std::apply([obj, basefun](auto... a)mutable{((*obj).*basefun)(a...);}, captured_get(there_args));
+				auto old_arg_tags = std::apply([](auto&... a){return get_tags(a...);}, there_args);
+				std::apply([obj, basefun](auto&... a)mutable{((*obj).*basefun)(a...);}, captured_get(there_args));
 				goto_tags(old_arg_tags, there_args);
 			};
 			auto back = [obj, dualfun]() mutable {
@@ -568,13 +629,13 @@ namespace 🍆 {
 			std::tuple_element_t<0, R> return_value = std::move(std::get<0>(fun_ret));
 			auto dual_args = std::apply([](auto... args){return capture(args...);}, trim_tuple(std::move(fun_ret)));
 			auto there = [there_args{std::move(there_args)}, obj, basefun]() mutable {
-				auto old_arg_tags = std::apply([](const auto&... a){return Journal::get_tags(a...);}, there_args);
-				std::apply([obj, basefun](auto... a)mutable{((*obj).*basefun)(a...);}, captured_get(there_args));
+				auto old_arg_tags = std::apply([](auto&... a){return get_tags(a...);}, there_args);
+				std::apply([obj, basefun](auto&... a)mutable{((*obj).*basefun)(a...);}, captured_get(there_args));
 				goto_tags(old_arg_tags, there_args);
 			};
 			auto back = [dual_args{std::move(dual_args)}, obj, dualfun]() mutable {
-				auto old_arg_tags = std::apply([](const auto&... a){return Journal::get_tags(a...);}, dual_args);
-				std::apply([obj, dualfun](auto... a)mutable{((*obj).*dualfun)(a...);}, captured_get(dual_args));
+				auto old_arg_tags = std::apply([](auto&... a){return get_tags(a...);}, dual_args);
+				std::apply([obj, dualfun](auto&... a)mutable{((*obj).*dualfun)(a...);}, captured_get(dual_args));
 				goto_tags(old_arg_tags, dual_args);
 			};
 			add_new_vertex(wrap_lambda(std::move(there)), wrap_lambda(std::move(back)));
@@ -586,8 +647,8 @@ namespace 🍆 {
 			auto there_args = capture(args...);
 			auto fun_ret = ((*obj).*basefun)(args...);
 			auto there = [there_args{std::move(there_args)}, obj, basefun]() mutable {
-				auto old_arg_tags = std::apply([](const auto&... a){return Journal::get_tags(a...);}, there_args);
-				std::apply([obj, basefun](auto... a)mutable{((*obj).*basefun)(a...);}, captured_get(there_args));
+				auto old_arg_tags = std::apply([](auto&... a){return get_tags(a...);}, there_args);
+				std::apply([obj, basefun](auto&... a)mutable{((*obj).*basefun)(a...);}, captured_get(there_args));
 				goto_tags(old_arg_tags, there_args);
 			};
 			auto back = [obj, dualfun]() mutable {
@@ -596,7 +657,26 @@ namespace 🍆 {
 			add_new_vertex(wrap_lambda(std::move(there)), wrap_lambda(std::move(back)));
 			return std::move(std::get<0>(fun_ret));
 		}
+
+		template<typename T, typename F, typename... Args>
+		static std::invoke_result_t<F, StrongObject<T>, Args...> lazy_call(StrongObject<T>& obj, F&& function, Args&... args) {
+			using return_type = std::invoke_result_t<F, StrongObject<T>, Args...>;
+			using function_result_type = std::conditional_t<std::is_same_v<return_type, StrongObject<Integer>>, StrongObject<Integer>, StrongObjectImpl>;
+			return return_type(std::make_unique<std::function<function_result_type()>>(wrap_lambda([function{std::move(function)}, captured_obj{capture(obj)}, captured_args{capture(args...)}]()mutable->function_result_type{
+				auto old_arg_tags = std::apply([](auto&... ar){return Journal::get_tags(ar...);}, captured_args);
+				auto old_obj_tag = std::apply([](auto&... ar){return Journal::get_tags(ar...);}, captured_obj);
+				auto result = std::apply([&function, &captured_obj](auto&... ar)mutable{return function(std::get<0>(captured_get(captured_obj)), ar...);}, captured_get(captured_args));
+				goto_tags(old_arg_tags, captured_args);
+				goto_tags(old_obj_tag, captured_obj);
+				return result;
+			})));
+		}
 	};
+
+	template<typename T, typename F, typename... Args>
+	std::invoke_result_t<F, StrongObject<T>, Args...> lazy_call(StrongObject<T> obj, F function, Args&&... args) {
+		return Journal::lazy_call(obj, std::move(function), args...);
+	}
 }
 
 #include "overrides.h"

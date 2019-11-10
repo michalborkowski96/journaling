@@ -2,15 +2,67 @@ import "../stdlib/integer.🍆"
 import "../stdlib/list.🍆"
 
 struct Main {
-	constructor(){};
-	fun void main(){
-		auto out = new StdOut();
-		var List<Integer> ints = new List<Integer>();
-		for(var int i = 0; i < 10; i = i + 1) {
-			ints.push_back(new Integer(i));
+	strong OutputStream out;
+	fun int sum_list(List<Integer> l) {
+		out.print_string("Start sum_list with ");
+		l.print(:out);
+		out.print_newline();
+		var int sum = 0;
+		for(auto it = l.begin(); !it.eq(l.end()); it = it.next()) {
+			sum = sum + it.deref().to_int();
 		}
-		out.print_int_ln(ints.size());
+		out.print_string("Done sum_list with ");
+		l.print(:out);
+		out.print_newline();
+		return sum;
+	};
+	fun Integer sum_listI(List<Integer> l) {
+		out.print_string("Start sum_listI with ");
+		l.print(:out);
+		out.print_newline();
+		var Integer sum = new Integer(0);
+		for(auto it = l.begin(); !it.eq(l.end()); it = it.next()) {
+			sum = sum + it.deref();
+		}
+		out.print_string("Done sum_listI with ");
+		l.print(:out);
+		out.print_newline();
+		return sum;
+	};
+	constructor(){
+		out = new StdOut();
+	};
+	fun void print_ints_info(List<Integer> ints){
+		out.print_string("Ints size: ");
+		out.print_int(ints.size());
+		out.print_newline();
 		ints.print(:out);
 		out.print_newline();
+	};
+	fun void main(){
+		var List<Integer> ints = new List<Integer>();
+		for(var int i = 0; i < 3; i = i + 1) {
+			ints.push_back(new Integer(i));
+		}
+		auto sum0 = sum_list[ints];
+		for(var int i = 3; i < 6; i = i + 1) {
+			ints.push_back(new Integer(i));
+		}
+		auto sum1 = sum_listI[ints];
+		for(var int i = 6; i < 9; i = i + 1) {
+			ints.push_back(new Integer(i));
+		}
+		print_ints_info(ints);
+		out.print_string("Sum0: ");
+		out.print_int_ln(sum0);
+		print_ints_info(ints);
+		out.print_string("Sum1: ");
+		sum1.print(:out);
+		out.print_newline();
+		print_ints_info(ints);
+
+
+
+/*JESZCZE SORT PORÓWNAĆ!*/
 	};
 }

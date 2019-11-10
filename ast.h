@@ -233,7 +233,7 @@ namespace ast {
 	}
 
 	enum class FunctionKind {
-		DUAL, NOEFFECT
+		DUAL, NOEFFECT, AUTO
 	};
 
 	struct Constructor : public AstNode {
