@@ -387,6 +387,11 @@ namespace 🍆 {
 			void destroy(){
 				if(tree && ((--std::get<2>(vertex->data)) == 0)) {
 					vertex->untag(*tree);
+					VertexType* root = tree->get_root();
+					if(root) {
+						std::get<0>(root->data) = nullptr;
+						std::get<1>(root->data) = nullptr;
+					}
 					tree = nullptr;
 				}
 			}
@@ -399,6 +404,11 @@ namespace 🍆 {
 				v->tag();
 				if((--std::get<2>(vertex->data)) == 0) {
 					vertex->untag(*tree);
+					VertexType* root = tree->get_root();
+					if(root) {
+						std::get<0>(root->data) = nullptr;
+						std::get<1>(root->data) = nullptr;
+					}
 				}
 				vertex = v;
 			}

@@ -87,6 +87,9 @@ private:
 	TaggedTree(const TaggedTree&) = delete;
 	TaggedTree(TaggedTree&&) = delete;
 public:
+	Vertex* get_root() const {
+		return root.get();
+	}
 	static std::pair<std::unique_ptr<TaggedTree>, Vertex*> make_tree(T data) {
 		auto tree = std::unique_ptr<TaggedTree>(new TaggedTree());
 		tree->root = std::unique_ptr<Vertex>(new Vertex(0, nullptr, 0, std::move(data), true));
