@@ -1,6 +1,7 @@
 #ifndef 🍆
 #define 🍆
 
+#include "group_pointer.h"
 #include "tagged_tree.h"
 
 #include <variant>
@@ -160,13 +161,13 @@ namespace 🍆 {
 		template<typename U>
 		friend class StrongObject;
 		friend class WeakObjectImpl;
-		static const std::shared_ptr<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>> null_ptr_var;
-		std::shared_ptr<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>> obj;
+		static const GroupSharedPointer<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>> null_ptr_var;
+		GroupSharedPointer<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>> obj;
 	public:
 		StrongObjectImpl(const Null&) : obj(null_ptr_var) {}
 		StrongObjectImpl() : obj(null_ptr_var) {}
 		StrongObjectImpl(const WeakObjectImpl& o);
-		StrongObjectImpl(std::unique_ptr<std::function<StrongObjectImpl()>> o) : obj(std::make_shared<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>>(std::move(o))) {}
+		StrongObjectImpl(std::unique_ptr<std::function<StrongObjectImpl()>> o) : obj(new std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>(std::move(o))) {}
 
 		StrongObject<Integer> operator==(StrongObjectImpl b) {
 			return std::visit(overload(
@@ -195,19 +196,20 @@ namespace 🍆 {
 				StrongObjectImpl val = (*f)();
 				std::shared_ptr<void> v = val.get_value();
 				*obj = v;
+				val.obj.group_assume(obj);
 				return v;
 			}
 			), *obj);
 		}
 	};
 
-	const std::shared_ptr<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>> StrongObjectImpl::null_ptr_var = std::make_shared<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>>(std::shared_ptr<void>(nullptr));
+	const GroupSharedPointer<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>> StrongObjectImpl::null_ptr_var(new std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>(std::shared_ptr<void>(nullptr)));
 
 	class WeakObjectImpl {
 		template<typename U>
 		friend class WeakObject;
 		friend class StrongObjectImpl;
-		std::weak_ptr<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>> obj;
+		GroupWeakPointer<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>> obj;
 	public:
 		WeakObjectImpl(const Null&) : obj(StrongObjectImpl::null_ptr_var) {}
 		WeakObjectImpl() : obj(StrongObjectImpl::null_ptr_var) {}
@@ -226,7 +228,7 @@ namespace 🍆 {
 		}
 	};
 
-	StrongObjectImpl::StrongObjectImpl(const WeakObjectImpl& o) : obj(o.obj) {}
+	StrongObjectImpl::StrongObjectImpl(const WeakObjectImpl& o) : obj(o.obj.lock()) {}
 
 	template<typename T>
 	class WeakObject;
@@ -259,7 +261,7 @@ namespace 🍆 {
 			std::shared_ptr<T> ptr(reinterpret_cast<T*>(memory), std::function<void(T*)>([](T* ptr){
 				delete[](reinterpret_cast<char*>(ptr));
 			}));
-			ret.obj.obj = std::make_shared<typename decltype(ret.obj.obj)::element_type>(ptr);
+			ret.obj.obj = decltype(ret.obj.obj)(new typename decltype(ret.obj.obj)::element_type(ptr));
 			new (reinterpret_cast<T*>(memory)) T(ret, std::forward<Ts>(args)...);
 			*std::get_deleter<std::function<void(T*)>>(ptr) = [](T* ptr){
 				ptr->~T();
