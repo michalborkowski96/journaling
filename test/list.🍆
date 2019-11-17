@@ -52,6 +52,8 @@ struct Main {
 		for(var int i = 6; i < 9; i = i + 1) {
 			ints.push_back(new Integer(i));
 		}
+		ints.begin().set(new Integer(-2));
+		ints.end().prev().set(new Integer(-10));
 		print_ints_info(ints);
 		out.print_string("Sum0: ");
 		out.print_int_ln(sum0);
@@ -60,9 +62,5 @@ struct Main {
 		sum1.print(:out);
 		out.print_newline();
 		print_ints_info(ints);
-
-
-
-/*JESZCZE SORT PORÓWNAĆ!*/
 	};
 }

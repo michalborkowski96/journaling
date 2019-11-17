@@ -4,9 +4,6 @@
 #include <algorithm>
 #include <cstddef>
 
-#warning iostream
-#include <iostream>
-
 namespace {
 	template<typename T>
 	class ControlBlock {

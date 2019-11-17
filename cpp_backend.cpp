@@ -136,11 +136,7 @@ public:
 		[&](const std::unique_ptr<StringLiteral>& e){
 			print_data(u8"🍆::StrongObject<Type_String>::make_object((long long) \"");
 			for(char c : e->value) {
-				if((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
-					print_data(c);
-				} else {
-					print_data("\\x", hex_chars[(c & 0xF0) >> 4], hex_chars[c & 0x0F]);
-				}
+				print_data("\\x", hex_chars[(c & 0xF0) >> 4], hex_chars[c & 0x0F]);
 			}
 			print_data("\", ", e->value.size(), "LL)");
 		},

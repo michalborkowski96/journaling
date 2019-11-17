@@ -20,6 +20,8 @@ constexpr const char* const LESS_FUN_NAME = "less";
 constexpr const char* const LESS_EQUAL_FUN_NAME = "le";
 constexpr const char* const MORE_FUN_NAME = "more";
 constexpr const char* const MORE_EQUAL_FUN_NAME = "me";
+constexpr const char* const EQUAL_FUN_NAME = "eq";
+constexpr const char* const NOT_EQUAL_FUN_NAME = "neq";
 
 constexpr const char* const STRING_TYPE_NAME = "String";
 constexpr const char* const INT_TYPE_NAME = "int";

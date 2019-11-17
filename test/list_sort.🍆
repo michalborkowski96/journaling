@@ -1,0 +1,47 @@
+import "../stdlib/integer.🍆"
+import "../stdlib/list.🍆"
+
+struct Main {
+	strong OutputStream out;
+	fun int lazy_print(List<int> l) {
+
+		auto i = l.begin();
+		out.print_string("{");
+		if(!i.eq(l.end())) {
+			out.print_int(i.deref());
+			i = i.next();
+		}
+		while(!i.eq(l.end())) {
+			out.print_string(", ");
+			out.print_int(i.deref());
+			i = i.next();
+		}
+		out.print_string("}");
+
+		out.print_newline();
+		return 0;
+	};
+	fun void eval(int i) {
+		if(i == 0) {}
+	};
+	constructor(){
+		out = new StdOut();
+	};
+	fun void main(){
+		var List<int> ints = new List<int>();
+		ints.push_back(4);
+		ints.push_back(7);
+		ints.push_back(2);
+		ints.push_back(6);
+		ints.push_back(4);
+		ints.push_back(0);
+		ints.push_back(345);
+		ints.push_back(-5);
+		ints.push_back(77);
+		var int u = lazy_print[ints];
+		ints.sort(:new DefaultComparator<int>());
+		eval(lazy_print(ints));
+		eval(u);
+		eval(lazy_print(ints));
+	};
+}

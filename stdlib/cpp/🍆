@@ -10,9 +10,6 @@
 #include <type_traits>
 #include <tuple>
 
-#warning iostream
-#include <iostream>
-
 namespace 🍆 {
 	template <typename... Fs>
 	struct overload : std::remove_reference_t<Fs>... {
@@ -97,6 +94,12 @@ namespace 🍆 {
 		}
 		StrongObject<Integer> fun_me(StrongObject<Integer> o) const {
 			return StrongObject<Integer>(value >= o.get_value());
+		}
+		StrongObject<Integer> fun_eq(StrongObject<Integer> o) const {
+			return StrongObject<Integer>(value == o.get_value());
+		}
+		StrongObject<Integer> fun_neq(StrongObject<Integer> o) const {
+			return StrongObject<Integer>(value != o.get_value());
 		}
 		StrongObject<Integer> fun_opp() const {
 			return StrongObject<Integer>(-value);
@@ -607,12 +610,12 @@ namespace 🍆 {
 			auto there_args = capture(args...);
 			auto dual_args = std::apply([this](auto... args){return capture(args...);}, ((*obj).*basefun)(args...));
 			auto there = [there_args{std::move(there_args)}, obj, basefun]() mutable {
-				auto old_arg_tags = std::apply([](const auto&... a){return get_tags(a...);}, there_args);
+				auto old_arg_tags = std::apply([](auto&... a){return get_tags(a...);}, there_args);
 				std::apply([obj, basefun](auto&... a)mutable{((*obj).*basefun)(a...);}, captured_get(there_args));
 				goto_tags(old_arg_tags, there_args);
 			};
 			auto back = [dual_args{std::move(dual_args)}, obj, dualfun]() mutable {
-				auto old_arg_tags = std::apply([](const auto&... a){return get_tags(a...);}, dual_args);
+				auto old_arg_tags = std::apply([](auto&... a){return get_tags(a...);}, dual_args);
 				std::apply([obj, dualfun](auto&... a)mutable{((*obj).*dualfun)(a...);}, captured_get(dual_args));
 				goto_tags(old_arg_tags, dual_args);
 			};

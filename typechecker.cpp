@@ -435,6 +435,8 @@ std::map<std::string, std::unique_ptr<BuiltinIntFunctionInfo>> IntTypeInfo::get_
 	ins(LESS_EQUAL_FUN_NAME, true);
 	ins(MORE_FUN_NAME, true);
 	ins(MORE_EQUAL_FUN_NAME, true);
+	ins(EQUAL_FUN_NAME, true);
+	ins(NOT_EQUAL_FUN_NAME, true);
 	return funs;
 }
 IntTypeInfo::IntTypeInfo() : funs(get_funs_map(this)) {}
@@ -833,6 +835,23 @@ std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, 
 			}
 		}
 	}
+
+	if(!ast->abstract && type_info->superclass) {
+		const RealClassInfo* superclass = dynamic_cast<const RealClassInfo*>(*type_info->superclass);
+		while(superclass && superclass->ast_data->abstract) {
+			for(const auto&[name, data] : superclass->functions) {
+				if(!data->fully_defined() && type_info->functions.find(name) == type_info->functions.end()) {
+					errors.emplace_back(ast->name, "Function " + name + " inherited from " + superclass->full_name() + " not fully defined in a non-abstract class.");
+				}
+			}
+			if(superclass->superclass) {
+				superclass = dynamic_cast<const RealClassInfo*>(*superclass->superclass);
+			} else {
+				break;
+			}
+		}
+	}
+
 	if(!errors.empty()) {
 		return errors;
 	}

@@ -130,18 +130,19 @@ abstract OrderedContainer Element Iterator : Container<Element, Iterator> {
 		}
 	} auto;
 
+	fun void swap(Iterator a, Iterator b) dual (Iterator a, Iterator b) {
+		swap(a, b);
+	};
+
 	fun void sort(Comparator<Element> comp) {
 		for(var Iterator e1 = begin(); !e1.eq(end()); e1 = e1.next()) {
 			for(var Iterator e2 = e1.next(); !e2.eq(end()); e2 = e2.next()) {
 				if(comp.less(e2.deref(), e1.deref())) {
-					var Element e1_elem = e1.deref();
-					var Element e2_elem = e2.deref();
-					var Iterator e1_next = e1.next();
-					var Iterator e2_next = e2.next();
-					this.erase(:e1);
-					this.erase(:e2);
-					e1 = this.insert(:e1_next, e2_elem);
-					e2 = this.insert(:e2_next, e1_elem);
+					this.swap(:e1, :e2);
+					/*this.insert(:e1, e2.deref());
+					this.insert(:e2, e1.deref());
+					e1 = this.erase(:e1).prev();
+					e2 = this.erase(:e2).prev();*/
 				}
 			}
 		}

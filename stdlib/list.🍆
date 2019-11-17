@@ -47,6 +47,13 @@ List T : OrderedContainer<T, ListElement_<T>> {
 		return size_;
 	} noeffect;
 
+	fun void swap(ListElement_<T> a, ListElement_<T> b) {
+		auto e = b.element_;
+		b.element_ = a.element_;
+		a.element_ = e;
+		return a, b;
+	} dual;
+
 	fun ListElement_<T> insert(ListElement_<T> iter, T element) {
 		size_ = size_ + 1;
 		var ListElement_<T> n = get_new_iterator_(element, iter, iter.prev_);
