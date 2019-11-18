@@ -1,0 +1,117 @@
+import "container.🍆"
+import "array.🍆"
+
+struct VectorIterator_ T {
+	weak Array<T> array_;
+	int index_;
+	constructor(Array<T> v, int i) {
+		array_ = v;
+		index_ = i;
+	};
+	fun VectorIterator_ next() {
+		return new VectorIterator_(array_, index_ + 1);
+	};
+	fun VectorIterator_ prev() {
+		return new VectorIterator_(array_, index_ - 1);
+	};
+
+	fun T deref(){
+		return array_.at(index_);
+	};
+
+	fun int eq(VectorIterator_ that) {
+		return index_ == that.index_;
+	};
+
+	fun int neq(VectorIterator_ that) {
+		return index_ != that.index_;
+	};
+}
+
+Vector T : OrderedContainer<T, VectorIterator_<T>> {
+	strong Array<T> array_;
+
+	constructor()(){
+		array_ = new Array<T>();
+	};
+
+	fun VectorIterator_<T> begin() {
+		return get_iter(0);
+	} noeffect;
+
+	fun VectorIterator_<T> end() {
+		return get_iter(array_.size());
+	} noeffect;
+
+	fun int size() {
+		return array_.size();
+	} noeffect;
+
+	fun void swap(VectorIterator_<T> a, VectorIterator_<T> b) {
+		swap_index(a.index_, b.index_);
+		return a, b;
+	} dual;
+
+	fun void swap_index(int a, int b) {
+		auto e = at(b);
+		set(b, at(a));
+		set(a, e);
+		return a, b;
+	} dual (int a, int b) {
+		swap_index(a, b);
+	};
+
+	fun T at(int i) {
+		return array_.at(i);
+	} noeffect;
+
+	fun VectorIterator_<T> get_iter(int i) {
+		return new VectorIterator_<T>(array_, i);
+	} noeffect;
+
+	fun void set(int i, T el) {
+		var T old = at(i);
+		array_.set(i, el);
+		return i, old;
+	} dual (int i, T el) {
+		array_.set(i, el);
+	};
+
+	fun void push_back_(T element) {
+		array_.push_back(element);
+	} dual () {
+		pop_back_();
+	};
+
+	fun void push_back(T element) {
+		this.push_back_(element);
+	} auto;
+
+	fun T pop_back_() {
+		var T el = array_.pop_back();
+		return el, el;
+	} dual (T el) {
+		push_back_(el);
+	};
+
+	fun void pop_back() {
+		this.pop_back_();
+	} auto;
+
+	fun VectorIterator_<T> insert(VectorIterator_<T> iter, T element) {
+		var int target = iter.index_;
+		push_back_(element);
+		for(var int i = size() - 1; i > target; i = i - 1) {
+			swap_index(i, i - 1);
+		}
+		return iter, iter;
+	} dual;
+
+	fun VectorIterator_<T> erase(VectorIterator_<T> iter) {
+		for(var int i = iter.index_; i < size() - 1; i = i + 1) {
+			swap_index(i, i + 1);
+		}
+		return iter, iter, pop_back_();
+	} dual;
+}
+

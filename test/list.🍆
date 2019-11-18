@@ -29,9 +29,6 @@ struct Main {
 		out.print_newline();
 		return sum;
 	};
-	constructor(){
-		out = new StdOut();
-	};
 	fun void print_ints_info(List<Integer> ints){
 		out.print_string("Ints size: ");
 		out.print_int(ints.size());
@@ -39,7 +36,7 @@ struct Main {
 		ints.print(:out);
 		out.print_newline();
 	};
-	fun void main(){
+	fun void test1(){
 		var List<Integer> ints = new List<Integer>();
 		for(var int i = 0; i < 3; i = i + 1) {
 			ints.push_back(new Integer(i));
@@ -62,5 +59,64 @@ struct Main {
 		sum1.print(:out);
 		out.print_newline();
 		print_ints_info(ints);
+	};
+
+
+	fun int lazy_print(List<int> l) {
+
+		auto i = l.begin();
+		out.print_string("{");
+		if(!i.eq(l.end())) {
+			out.print_int(i.deref());
+			i = i.next();
+		}
+		while(!i.eq(l.end())) {
+			out.print_string(", ");
+			out.print_int(i.deref());
+			i = i.next();
+		}
+		out.print_string("}");
+
+		out.print_newline();
+		return 0;
+	};
+	fun void eval(int i) {
+		if(i == 0) {}
+	};
+	fun void test2(){
+		var List<int> ints = new List<int>();
+		ints.push_back(4);
+		ints.push_back(7);
+		ints.push_back(2);
+		ints.push_back(6);
+		ints.push_back(4);
+		ints.push_back(0);
+		ints.push_back(345);
+		ints.push_back(-5);
+		ints.push_back(77);
+		var int u = lazy_print[ints];
+		ints.sort(:new DefaultComparator<int>());
+		eval(lazy_print(ints));
+		eval(u);
+		eval(lazy_print(ints));
+
+		out.print_newline();
+
+		u = lazy_print[ints];
+		ints.insert(:ints.begin().next().next().next(), 666);
+		eval(lazy_print(ints));
+		eval(u);
+		eval(lazy_print(ints));
+	};
+
+
+	constructor(){
+		out = new StdOut();
+	};
+
+	fun void main(){
+		test1();
+		out.print_newline();
+		test2();
 	};
 }

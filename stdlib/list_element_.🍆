@@ -13,8 +13,8 @@ struct ListElement_ T {
 		return element_;
 	};
 
-	fun void set(T e){
-		element_ = e;
+	fun void set(T element){
+		element_ = element;
 	};
 
 	fun ListElement_ next() {
