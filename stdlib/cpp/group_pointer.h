@@ -179,6 +179,9 @@ public:
 	void group_assume(const GroupSharedPointer<T>& o) {
 		control_block->group_assume(o.control_block);
 	}
+	explicit operator bool() const {
+		return control_block;
+	}
 };
 
 template<typename T>
@@ -230,6 +233,9 @@ public:
 	}
 	GroupSharedPointer<T> lock() const {
 		return GroupSharedPointer<T>(control_block);
+	}
+	explicit operator bool() const {
+		return control_block;
 	}
 };
 

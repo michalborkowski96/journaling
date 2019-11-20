@@ -17,12 +17,12 @@ struct AVLNode_ T {
 		data = e;
 	};
 
-	fun int eq(AVLNode_ o) {
-		return this == o;
+	fun int eq(AVLNode_ that) {
+		return this == that;
 	};
 
-	fun int neq(AVLNode_ o) {
-		return this != o;
+	fun int neq(AVLNode_ that) {
+		return this != that;
 	};
 
 	fun int recalc_height() {
@@ -35,9 +35,9 @@ struct AVLNode_ T {
 			hr = right_son.height;
 		}
 		if(hr > hl) {
-			height = hr;
+			height = hr + 1;
 		} else {
-			height = hl;
+			height = hl + 1;
 		}
 		return hr - hl;
 	};
@@ -83,38 +83,42 @@ struct AVLNode_ T {
 	};
 
 	fun void right_rotate() {
-		var AVLNode_ t = this;
 		var AVLNode_ ls = left_son;
 		ls.parent = parent;
 		left_son = ls.right_son;
+		if(left_son != null) {
+			left_son.parent = this;
+		}
 		ls.right_son = this;
 		parent = ls;
+		if(parent.parent != null) {
+			if(parent.parent.left_son == this) {
+				parent.parent.left_son = parent;
+			} else {
+				parent.parent.right_son = parent;
+			}
+		}
 		recalc_height();
 		parent.recalc_height();
-		if(parent.parent.left_son == this) {
-			parent.parent.left_son = parent;
-		} else {
-			parent.parent.right_son = parent;
-		}
 	};
 
 	fun void left_rotate() {
-		var AVLNode_ t = this;
 		var AVLNode_ rs = right_son;
 		rs.parent = parent;
 		right_son = rs.left_son;
+		if(right_son != null) {
+			right_son.parent = this;
+		}
 		rs.left_son = this;
 		parent = rs;
+		if(parent.parent != null) {
+			if(parent.parent.left_son == this) {
+				parent.parent.left_son = parent;
+			} else {
+				parent.parent.right_son = parent;
+			}
+		}
 		recalc_height();
 		parent.recalc_height();
-		if(parent.parent.left_son == this) {
-			parent.parent.left_son = parent;
-		} else {
-			parent.parent.right_son = parent;
-		}
-	};
-
-	fun int equals(AVLNode_ that) {
-		return this == that;
 	};
 }

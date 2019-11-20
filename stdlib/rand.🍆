@@ -1,0 +1,5 @@
+struct RandInt {
+	int result;
+	constructor(){};
+	constructor(int min, int max){};
+}

@@ -1,0 +1,72 @@
+import "../stdlib/integer.🍆"
+import "../stdlib/set.🍆"
+import "../stdlib/vector.🍆"
+import "../stdlib/rand.🍆"
+import "../stdlib/journal_tag.🍆"
+
+struct Main {
+	strong OutputStream out;
+	constructor(){
+		out = new StdOut();
+	};
+	fun void main(){
+		var int tests = 1000;
+		var int size = 30;
+
+		for(var int test = 0; test < tests; test = test + 1) {
+			out.print_string("Test ");
+			out.print_int(test);
+			out.print_newline();
+			auto ints = new Set<Integer>(new DefaultComparator<Integer>());
+			auto history = new Vector<Integer>();
+			for(var int i = 0; i < size; i = i + 1) {
+				auto ii = new Integer(new RandInt(-100, 100).result);
+
+					ii.print(:out);
+					out.print_newline();
+
+				history.push_back(ii);
+				ints.insert(ii);
+
+
+					history.print(:out);
+					out.print_newline();
+					ints.print_structural(:out);
+					out.print_newline();
+					out.flush();
+
+				auto pre_check = new JournalTag<Vector<Integer>>(history);
+				history.sort(:new DefaultComparator<Integer>());
+				for(var int j = 0; j < history.size() - 1;) {
+					if(history.at(j).eq(history.at(j + 1))) {
+						history.erase(:history.get_iter(j + 1));
+					} else {
+						j = j + 1;
+					}
+				}
+				auto hb = history.begin();
+				auto sb = ints.begin();
+				auto valid = 1;
+				while(hb.neq(history.end()) && sb.neq(ints.end())) {
+					if(hb.deref().neq(sb.deref())) {
+						valid = 0;
+						break;
+					}
+					hb = hb.next();
+					sb = sb.next();
+				}
+				if(hb.neq(history.end()) || sb.neq(ints.end())) {
+					valid = 0;
+				}
+				pre_check.bring_back();
+				if(!valid) {
+					history.print(:out);
+					out.print_newline();
+					ints.print_structural(:out);
+					out.print_newline();
+					return;
+				}
+			}
+		}
+	};
+}

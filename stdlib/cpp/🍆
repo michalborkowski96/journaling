@@ -231,7 +231,7 @@ namespace 🍆 {
 		}
 	};
 
-	StrongObjectImpl::StrongObjectImpl(const WeakObjectImpl& o) : obj(o.obj.lock()) {}
+	StrongObjectImpl::StrongObjectImpl(const WeakObjectImpl& o) : obj(o.obj ? o.obj.lock() : null_ptr_var) {}
 
 	template<typename T>
 	class WeakObject;
@@ -303,6 +303,10 @@ namespace 🍆 {
 		}
 		operator StrongObjectImpl() const {
 			return obj;
+		}
+
+		explicit operator bool() {
+			return (bool) get_value();
 		}
 	};
 
@@ -494,12 +498,13 @@ namespace 🍆 {
 		template<typename T>
 		struct Captured<T, true> {
 			using has_journal = std::true_type;
-			Tag tag;
+			std::optional<Tag> tag;
 			StrongObject<T> object;
 			Captured() = delete;
 			Captured(const Captured&) = delete;
 			Captured(Captured&&) = default;
 			Captured(Tag tag, StrongObject<T> object) : tag(std::move(tag)), object(std::move(object)) {}
+			Captured(StrongObject<T> object) : object(std::move(object)) {}
 		};
 
 		template<typename T>
@@ -519,7 +524,11 @@ namespace 🍆 {
 
 		template<typename T, std::enable_if_t<has_journal<T>::value, int> = 0>
 		static Captured<T> capture_do(StrongObject<T>& arg) {
-			return Captured<T>(arg->journal.get_tag(), arg);
+			if(arg) {
+				return Captured<T>(arg->journal.get_tag(), arg);
+			} else {
+				return Captured<T>(arg);
+			}
 		}
 
 		template<typename T, std::enable_if_t<!has_journal<T>::value, int> = 0>
@@ -534,12 +543,16 @@ namespace 🍆 {
 
 		template<typename... Args>
 		static std::tuple<StrongObject<Args>&...> captured_get(std::tuple<Captured<Args>...>& args) {
-			return std::apply([](Captured<Args>&... a){return std::tuple<StrongObject<Args>&...>(([](auto& arg)->decltype(arg.object)&{if constexpr (std::remove_reference<decltype(arg)>::type::has_journal::value) {arg.object->journal.goto_tag(arg.tag);} return arg.object;}(a))...);}, args);
+			return std::apply([](Captured<Args>&... a){return std::tuple<StrongObject<Args>&...>(([](auto& arg)->decltype(arg.object)&{if constexpr (std::remove_reference<decltype(arg)>::type::has_journal::value) {if(arg.tag) {arg.object->journal.goto_tag(*arg.tag);}} return arg.object;}(a))...);}, args);
 		}
 
 		template<typename T>
-		static std::tuple<Tag> get_tags_do(Captured<T, true>& a) {
-			return {a.object->journal.tag};
+		static std::tuple<std::optional<Tag>> get_tags_do(Captured<T, true>& a) {
+			if(a.object) {
+				return {a.object->journal.tag};
+			} else {
+				return {{}};
+			}
 		}
 
 		template<typename T>
@@ -548,26 +561,28 @@ namespace 🍆 {
 		}
 
 		template<typename... Args>
-		static std::array<Tag, count_types_with_journal<Args...>::value> get_tags(Captured<Args>&... args) {
-			return std::apply([](auto&&... args){return std::array<Tag, count_types_with_journal<Args...>::value>{std::forward<decltype(args)>(args)...};}, std::tuple_cat(get_tags_do(args)...));
+		static std::array<std::optional<Tag>, count_types_with_journal<Args...>::value> get_tags(Captured<Args>&... args) {
+			return std::apply([](auto&&... args){return std::array<std::optional<Tag>, count_types_with_journal<Args...>::value>{std::forward<decltype(args)>(args)...};}, std::tuple_cat(get_tags_do(args)...));
 		}
 
 		template<size_t i, size_t j>
-		static void goto_tags_do(const std::array<Tag, j>&) {}
+		static void goto_tags_do(const std::array<std::optional<Tag>, j>&) {}
 
 		template<size_t i, size_t j, typename T, typename... Args>
-		static void goto_tags_do(const std::array<Tag, j>& tags, Captured<T, true>& arg, Captured<Args>&... args) {
-			arg.object->journal.goto_tag(tags[i]);
+		static void goto_tags_do(const std::array<std::optional<Tag>, j>& tags, Captured<T, true>& arg, Captured<Args>&... args) {
+			if(arg.object) {
+				arg.object->journal.goto_tag(*tags[i]);
+			}
 			goto_tags_do<i + 1>(tags, args...);
 		}
 
 		template<size_t i, size_t j, typename T, typename... Args>
-		static void goto_tags_do(const std::array<Tag, j>& tags, Captured<T, false>&, Captured<Args>&... args) {
+		static void goto_tags_do(const std::array<std::optional<Tag>, j>& tags, Captured<T, false>&, Captured<Args>&... args) {
 			goto_tags_do<i>(tags, args...);
 		}
 
 		template<typename... Args>
-		static void goto_tags(const std::array<Tag, count_types_with_journal<Args...>::value>& tags, std::tuple<Captured<Args>...>& args) {
+		static void goto_tags(const std::array<std::optional<Tag>, count_types_with_journal<Args...>::value>& tags, std::tuple<Captured<Args>...>& args) {
 			std::apply([&tags](auto&... a){goto_tags_do<0>(tags, a...);}, args);
 		}
 

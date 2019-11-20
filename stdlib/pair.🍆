@@ -30,9 +30,9 @@ struct Pair T U {
 	optional {
 		fun void print(OutputStream o) {
 			o.print_string("{");
-			first.print(o);
+			first.print(:o);
 			o.print_string(", ");
-			second.print(o);
+			second.print(:o);
 			o.print_string("}");
 		};
 	}

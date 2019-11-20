@@ -1,20 +1,23 @@
 import "container.🍆"
 import "avl_.🍆"
 import "integer.🍆"
+import "pair.🍆"
 
 Set T : Container<T, AVLNode_<T>> {
 	int size_;
 	strong Comparator<T> comparator_;
-	strong AVLNode_<T> end_;
+	strong AVLNode_<T> root_;
+	weak AVLNode_<T> end_;
 	constructor(Comparator<T> c) () {
 		comparator_ = c;
-		end_ = new AVLNode_<T>(null, null);
+		root_ = new AVLNode_<T>(null, null);
+		end_ = root_;
 	};
 	fun int size() {
 		return size_;
 	} noeffect;
 	fun AVLNode_<T> begin() {
-		var AVLNode_<T> b = end_;
+		var AVLNode_<T> b = root_;
 		while(b.left_son != null) {
 			b = b.left_son;
 		}
@@ -24,11 +27,8 @@ Set T : Container<T, AVLNode_<T>> {
 		return end_;
 	} noeffect;
 	fun AVLNode_<T> find(T key) {
-		if(empty()) {
-			return end_;
-		}
-		var AVLNode_<T> node = end_.left_son;
-		while(node != null) {
+		var AVLNode_<T> node = root_;
+		while(node != null && node != end_) {
 			var T k = node.deref();
 			if(comparator_.eq(key, k)) {
 				return node;
@@ -42,17 +42,65 @@ Set T : Container<T, AVLNode_<T>> {
 		return end_;
 	} noeffect;
 
+	fun void print_structural_(AVLNode_<T> node, OutputStream out){
+		if(node == null) {
+			out.print_string("");
+		out.flush();
+			return;
+		}
+		if(node.deref() != null) {
+			node.deref().print(:out);
+		out.flush();
+		} else {
+			out.print_string("null");
+		out.flush();
+		}
+		out.print_string(": H ");
+		out.flush();
+		out.print_int(node.height);
+		out.flush();
+		out.print_string(": P ");
+		out.flush();
+		if(node.parent != null) {
+			if(node.parent.deref() != null) {
+				node.parent.deref().print(:out);
+		out.flush();
+			} else {
+				out.print_string("null");
+		out.flush();
+			}
+		}
+		out.print_string(" {");
+		out.flush();
+		print_structural_(node.left_son, out);
+		out.print_string(", ");
+		out.flush();
+		print_structural_(node.right_son, out);
+		out.print_string("}");
+		out.flush();
+	} noeffect;
+
+	fun void print_structural(OutputStream out){
+		print_structural_(root_, out);
+	} noeffect;
+
 	fun AVLNode_<T> rebalance_(AVLNode_<T> z) {
 		var int bal = z.recalc_height();
 		if(bal == -2) {
 			if(z.left_son.recalc_height() == 1) {
 				z.left_son.left_rotate();
 			}
+			if(z == root_) {
+				root_ = z.left_son;
+			}
 			z.right_rotate();
 			z = z.parent;
 		} else  if (bal == 2) {
 			if(z.right_son.recalc_height() == -1) {
 				z.right_son.right_rotate();
+			}
+			if(z == root_) {
+				root_ = z.right_son;
 			}
 			z.left_rotate();
 			z = z.parent;
@@ -61,12 +109,18 @@ Set T : Container<T, AVLNode_<T>> {
 	} noeffect;
 
 	fun Pair<Integer, T> insert(T entry) {
-		var AVLNode_<T> node = end_.left_son;
-		if(node == null) {
-			end_.left_son = new AVLNode_<T>(entry, end_);
-			return new Pair<Integer, T>(new Integer(0), null), null, 0;
-		}
+		var AVLNode_<T> node = root_;
 		while(1) {
+			if(node == end_) {
+				if(node.left_son != null) {
+					node = node.left_son;
+					continue;
+				} else {
+					node.left_son = new AVLNode_<T>(entry, node);
+					node = node.left_son;
+					break;
+				}
+			}
 			var T k = node.deref();
 			if(comparator_.eq(entry, k)) {
 				var T old = node.deref();
@@ -91,11 +145,10 @@ Set T : Container<T, AVLNode_<T>> {
 				}
 			}
 		}
-		var AVLNode_<T> z = node.parent;
-		while(z.parent != null) {
-			z = rebalance_(z);
+		while(node != null) {
+			node = rebalance_(node);
 		}
-		return new Pair<Integer, T>(new Integer(0), null), null, 0;
+		return new Pair<Integer, T>(new Integer(0), null), entry, 0;
 	} dual (T old, int had_old) {
 		if(had_old) {
 			insert(old);
@@ -106,7 +159,7 @@ Set T : Container<T, AVLNode_<T>> {
 
 	fun Pair<Integer, T> erase(T key) {
 		var AVLNode_<T> node = find(key);
-		if(node.equals(end_)) {
+		if(node.eq(end_)) {
 			return new Pair<Integer, T>(new Integer(0), null), null, 0;
 		}
 		var T old = node.deref();
@@ -117,16 +170,24 @@ Set T : Container<T, AVLNode_<T>> {
 				node.parent.right_son = null;
 			}
 		} else if (node.left_son != null && node.right_son == null) {
-			if(node.parent.left_son == node) {
-				node.parent.left_son = node.left_son;
+			if(node.parent) {
+				if(node.parent.left_son == node) {
+					node.parent.left_son = node.left_son;
+				} else {
+					node.parent.right_son = node.left_son;
+				}
 			} else {
-				node.parent.right_son = node.left_son;
+				root_ = node.left_son;
 			}
 		} else if (node.left_son == null && node.right_son != null) {
-			if(node.parent.left_son == node) {
-				node.parent.left_son = node.right_son;
+			if(node.parent) {
+				if(node.parent.left_son == node) {
+					node.parent.left_son = node.right_son;
+				} else {
+					node.parent.right_son = node.right_son;
+				}
 			} else {
-				node.parent.right_son = node.right_son;
+				root_ = node.right_son;
 			}
 		} else {
 			var AVLNode_<T> to_remove;
@@ -140,10 +201,10 @@ Set T : Container<T, AVLNode_<T>> {
 			node = to_remove;
 		}
 		node = node.parent;
-		while(node.parent != null) {
+		while(node != null) {
 			node = rebalance_(node);
 		}
-		return new Pair<Integer, T>(new Integer(0), old), old, 0;
+		return new Pair<Integer, T>(new Integer(1), old), old, 1;
 	} dual (T old, int had_old) {
 		if(had_old) {
 			insert(old);

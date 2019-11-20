@@ -968,13 +968,18 @@ std::variant<std::unique_ptr<RealFunctionInfo>, std::vector<TypeError>> RealFunc
 		if(!same_types(rt, fi.return_type)) {
 			errors.emplace_back(ast->name, "Function overrides another function, but has different return type, (" + rt->full_name() + " instead of " + fi.return_type->full_name() + ").");
 		}
-		if(ast->kind != fi.kind()) {
-			errors.emplace_back(ast->name, "Function overrides another function, but has different kind.");
+
+		if(ast->kind != fi.kind() && ((ast->kind == FunctionKind::NOEFFECT) || (fi.kind() == FunctionKind::NOEFFECT))) {
+			errors.emplace_back(ast->name, "Noefffect can only be overridden by noefffect and vice versa.");
 		}
 	}
 
 	if(ast->kind == FunctionKind::DUAL && !dual && body) {
 		errors.emplace_back(ast->name, "Dual function has primary definition, but no dual definition.");
+	}
+
+	if(ast->kind != FunctionKind::DUAL) {
+		dual = {};
 	}
 
 	if(!errors.empty()) {
