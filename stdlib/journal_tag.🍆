@@ -1,0 +1,11 @@
+JournalTag_ T {
+	fun void t(T tt){t(tt);} noeffect;
+}
+
+nojournal JournalTag T {
+	weak T asdf; /*int cannot have tags*/
+	fun void t_(JournalTag_<T> ttt, T tt){ttt.t(tt);}; /*only accept journalable types*/
+
+	constructor(T t){};
+	fun void bring_back(){};
+}

@@ -1,1 +1,0 @@
-#warning JOURNAL_TOOLS

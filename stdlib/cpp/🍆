@@ -382,6 +382,7 @@ namespace 🍆 {
 			using type = R (O::*)(Ts...);
 		};
 
+		public:
 		class Tag {
 			using VertexType = TaggedTree<std::tuple<std::function<void()>, std::function<void()>, size_t>>::Vertex;
 			std::shared_ptr<TaggedTree<std::tuple<std::function<void()>, std::function<void()>, size_t>>> tree;
@@ -415,6 +416,14 @@ namespace 🍆 {
 				}
 				vertex = v;
 			}
+			static Tag make_new() {
+				auto tree = TaggedTree<std::tuple<std::function<void()>, std::function<void()>, size_t>>::make_tree(std::make_tuple(std::function<void()>(), std::function<void()>(), 1));
+				return Tag(std::move(tree.first), tree.second);
+			}
+			Tag grow(std::function<void()> there, std::function<void()> back) const {
+				auto new_vertex = vertex->grow(std::make_tuple(std::move(there), std::move(back), 1));
+				return Tag(tree, new_vertex);
+			}
 		public:
 			Tag() = delete;
 			Tag& operator=(const Tag& o) {
@@ -436,14 +445,6 @@ namespace 🍆 {
 			Tag(Tag&& o) : tree(std::move(o.tree)), vertex(o.vertex) {}
 			~Tag() {
 				destroy();
-			}
-			static Tag make_new() {
-				auto tree = TaggedTree<std::tuple<std::function<void()>, std::function<void()>, size_t>>::make_tree(std::make_tuple(std::function<void()>(), std::function<void()>(), 1));
-				return Tag(std::move(tree.first), tree.second);
-			}
-			Tag grow(std::function<void()> there, std::function<void()> back) const {
-				auto new_vertex = vertex->grow(std::make_tuple(std::move(there), std::move(back), 1));
-				return Tag(tree, new_vertex);
 			}
 		};
 

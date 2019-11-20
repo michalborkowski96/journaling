@@ -640,7 +640,9 @@ std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, 
 
 	{
 		auto add_variable = [&](const ClassVariable& node, std::string name, const TypeInfo* type){
-			if(type_info->variables.find(name) != type_info->variables.end()) {
+			if(std::visit(overload([](const ClassVariableInteger&){return false;}, [](const ClassVariablePointer& n){return !n.strong;}), node) && dynamic_cast<const IntTypeInfo*>(type)) {
+				std::visit([&](const auto& n){errors.emplace_back(n, "Weak pointers cannot be of builtin type 'int'.");}, node);
+			} else if(type_info->variables.find(name) != type_info->variables.end()) {
 				std::visit([&](const auto& n){errors.emplace_back(n, "Redeclaration of a class variable.");}, node);
 			} else {
 				type_info->variables.emplace(std::move(name), type);
