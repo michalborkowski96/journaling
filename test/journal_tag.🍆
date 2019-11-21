@@ -7,6 +7,10 @@ struct Main {
 	strong OutputStream out;
 	constructor(){
 		out = new StdOut();
+
+		var int i = 4;
+		auto t = new JournalTag<int>(i);
+		t.bring_back();
 	};
 	fun void main(){
 		var List<Integer> list = new List<Integer>();
