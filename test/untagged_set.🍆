@@ -3,7 +3,6 @@ import "../stdlib/set.🍆"
 import "../stdlib/vector.🍆"
 import "../stdlib/rand.🍆"
 import "../stdlib/journal_tag.🍆"
-import "../stdlib/error.🍆"
 
 struct Main {
 	strong OutputStream out;
@@ -14,11 +13,34 @@ struct Main {
 		var int tests = 1000;
 		var int size = 50;
 
+		{
+			auto ints = new UntaggedSet<Integer>(new DefaultComparator<Integer>());
+			ints.insert(new Integer(1));
+			ints.insert(new Integer(2));
+			auto tag = new JournalTag<UntaggedSet<Integer>>(ints);
+			ints.insert(new Integer(3));
+			ints.insert(new Integer(3));
+			ints.insert(new Integer(4));
+			ints.erase(new Integer(2));
+			ints.erase(new Integer(3));
+			auto tag2 = new JournalTag<UntaggedSet<Integer>>(ints);
+			ints.print(:out);
+			out.print_newline();
+			tag.bring_back();
+			ints.print(:out);
+			out.print_newline();
+			tag2.bring_back();
+			ints.print(:out);
+			out.print_newline();
+		}
+
+		new StdIn().get_string();
+
 		for(var int test = 0; test < tests; test = test + 1) {
 			out.print_string("Test ");
 			out.print_int(test);
 			out.print_newline();
-			auto ints = new Set<Integer>(new DefaultComparator<Integer>());
+			auto ints = new UntaggedSet<Integer>(new DefaultComparator<Integer>());
 			auto history = new Vector<Integer>();
 			for(var int i = 0; i < size; i = i + 1) {
 				auto ii = new Integer(new RandInt(-100, 100).result);
@@ -52,7 +74,7 @@ struct Main {
 				if(!valid) {
 					history.print(:out);
 					out.print_newline();
-					ints.print_structural(:out);
+					ints.print(:out);
 					out.print_newline();
 					return;
 				}
@@ -70,10 +92,6 @@ struct Main {
 			while(!history.empty()) {
 				ints.erase(history.pop_back());
 				if(ints.size() != history.size()) {
-					out.print_int(ints.size());
-					out.print_int(history.size());
-					out.flush();
-					auto a = new Error("dfg");
 					valid = 0;
 				}
 				for(var int x = 0; x < history.size(); x = x + 1) {
@@ -85,7 +103,7 @@ struct Main {
 					pre_check.bring_back();
 					history.print(:out);
 					out.print_newline();
-					ints.print_structural(:out);
+					ints.print(:out);
 					out.print_newline();
 					return;
 				}

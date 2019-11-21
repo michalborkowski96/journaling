@@ -3,7 +3,7 @@ import "avl_.🍆"
 import "integer.🍆"
 import "pair.🍆"
 
-Set T : Container<T, AVLNode_<T>> {
+UntaggedSet T : Container<T, AVLNode_<T>> {
 	int size_;
 	strong Comparator<T> comparator_;
 	strong AVLNode_<T> root_;
@@ -50,6 +50,7 @@ Set T : Container<T, AVLNode_<T>> {
 		return end_;
 	} noeffect;
 
+	/*
 	fun void print_structural_(AVLNode_<T> node, OutputStream out){
 		if(node == null) {
 			out.print_string("");
@@ -93,6 +94,9 @@ Set T : Container<T, AVLNode_<T>> {
 		out.print_string(" ");
 		print_structural_(root_, out);
 	} noeffect;
+
+	That's just for debug.
+	*/
 
 	fun AVLNode_<T> rebalance_(AVLNode_<T> z) {
 		var int bal = z.recalc_height();
@@ -174,7 +178,7 @@ Set T : Container<T, AVLNode_<T>> {
 		if(had_old) {
 			insert_(old, null);
 		} else {
-			erase(old);
+			erase_iter(find(old));
 		}
 	};
 
@@ -229,40 +233,43 @@ Set T : Container<T, AVLNode_<T>> {
 	} noeffect;
 
 	fun Pair<Integer, T> erase_iter(AVLNode_<T> node) {
-		if(node.eq(end_)) {
-			return new Pair<Integer, T>(new Integer(0), null), null, null;
-		}
-		if(node.left_son == null && node.right_son == null) {
-			if(node.parent.left_son == node) {
-				node.parent.left_son = null;
-			} else {
-				node.parent.right_son = null;
+		while(1) {
+			if(node.eq(end_)) {
+				return new Pair<Integer, T>(new Integer(0), null), null, null;
 			}
-		} else if (node.left_son != null && node.right_son == null) {
-			node.left_son.parent = node.parent;
-			if(node.parent != null) {
+			if(node.left_son == null && node.right_son == null) {
 				if(node.parent.left_son == node) {
-					node.parent.left_son = node.left_son;
+					node.parent.left_son = null;
 				} else {
-					node.parent.right_son = node.left_son;
+					node.parent.right_son = null;
+				}
+			} else if (node.left_son != null && node.right_son == null) {
+				node.left_son.parent = node.parent;
+				if(node.parent != null) {
+					if(node.parent.left_son == node) {
+						node.parent.left_son = node.left_son;
+					} else {
+						node.parent.right_son = node.left_son;
+					}
+				} else {
+					root_ = node.left_son;
+				}
+			} else if (node.left_son == null && node.right_son != null) {
+				node.right_son.parent = node.parent;
+				if(node.parent != null) {
+					if(node.parent.left_son == node) {
+						node.parent.left_son = node.right_son;
+					} else {
+						node.parent.right_son = node.right_son;
+					}
+				} else {
+					root_ = node.right_son;
 				}
 			} else {
-				root_ = node.left_son;
+				swap_(node, node.next());
+				continue;
 			}
-		} else if (node.left_son == null && node.right_son != null) {
-			node.right_son.parent = node.parent;
-			if(node.parent != null) {
-				if(node.parent.left_son == node) {
-					node.parent.left_son = node.right_son;
-				} else {
-					node.parent.right_son = node.right_son;
-				}
-			} else {
-				root_ = node.right_son;
-			}
-		} else {
-			swap_(node, node.next());
-			return this.erase_iter(:node), null, null;
+			break;
 		}
 		var T old = node.deref();
 		auto old_node = node;
