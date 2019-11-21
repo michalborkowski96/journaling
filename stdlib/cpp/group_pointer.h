@@ -42,8 +42,25 @@ namespace {
 			last_block = get_last_block();
 			object = last_block->pointer.object_pointer;
 		}
-		size_t get_shared_count() const {
-			return shared_count;
+		bool valid() const {
+			const ControlBlock* cb = this;
+			while(cb) {
+				if(cb->shared_count != 0) {
+					return true;
+				}
+				cb = cb->previous_control_block_pointer;
+			}
+			cb = this;
+			while(true) {
+				if(cb->shared_count != 0) {
+					return true;
+				}
+				if(cb->pointer.raw.points_to_a_control_block) {
+					cb = cb->get_next_control_block();
+				} else {
+					return false;
+				}
+			}
 		}
 		void increase_shared_count(){
 			++shared_count;
@@ -66,24 +83,10 @@ namespace {
 		}
 
 		void try_free() {
-			ControlBlock* cb = this;
-			while(cb) {
-				if(cb->shared_count != 0) {
-					return;
-				}
-				cb = cb->previous_control_block_pointer;
+			if(valid()) {
+				return;
 			}
-			cb = this;
-			while(true) {
-				if(cb->shared_count != 0) {
-					return;
-				}
-				if(cb->pointer.raw.points_to_a_control_block) {
-					cb = cb->get_next_control_block();
-				} else {
-					break;
-				}
-			}
+			ControlBlock* cb = get_last_block();
 			cb->shared_count = 1;
 			delete cb->pointer.object_pointer;
 			cb->shared_count = 0;
@@ -119,7 +122,7 @@ class GroupSharedPointer {
 	friend class GroupWeakPointer<T>;
 	GroupSharedPointer(ControlBlock<T>* control_block) : control_block(control_block) {
 		if(control_block) {
-			if(control_block->get_shared_count() > 0) {
+			if(control_block->valid()) {
 				control_block->increase_shared_count();
 			} else {
 				this->control_block = nullptr;
