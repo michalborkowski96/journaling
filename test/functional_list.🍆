@@ -1,0 +1,43 @@
+import "../stdlib/iostream.🍆"
+
+nojournal FListInt {
+	int num;
+	strong FListInt next;
+	fun int get_num() {return num;};
+	fun FListInt get_next() {return next;};
+	fun void print(OutputStream out) {
+		out.print_string("{");
+		auto n = this;
+		while(n != null) {
+			out.print_int(n.get_num());
+			out.print_string(", ");
+			n = n.get_next();
+			out.flush();
+		}
+		out.print_string("}");
+		out.flush();
+	};
+
+	constructor(int n, FListInt ne){
+		num = n;
+		next = ne;
+	};
+}
+
+struct Main {
+	fun FListInt get_naturals_from(int n) {
+		return new FListInt(n, get_naturals_from[n + 1]);
+	};
+
+	strong OutputStream out;
+	constructor() {
+		out = new StdOut();
+	};
+	fun void main(){
+		var FListInt i = new FListInt(9, null);
+		i.print(out);
+		(new StdIn()).get_string();
+		i = get_naturals_from(4);
+		i.print(out);
+	};
+}
