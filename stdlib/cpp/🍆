@@ -30,7 +30,7 @@ namespace 🍆 {
 	class StrongObject<Integer> {
 		std::shared_ptr<std::variant<long long, std::unique_ptr<std::function<StrongObject<Integer>()>>>> value;
 	public:
-		using object_type = Integer;
+		using element_type = Integer;
 		StrongObject<Integer>();
 		StrongObject<Integer>(const Null&);
 		StrongObject<Integer>(Integer value);
@@ -243,7 +243,7 @@ namespace 🍆 {
 		template<typename U>
 		friend class StrongObject;
 	public:
-		using object_type = T;
+		using element_type = T;
 		T& operator*() {
 			return *std::static_pointer_cast<T>(obj.get_value());
 		}
@@ -317,7 +317,7 @@ namespace 🍆 {
 		template<typename U>
 		friend class WeakObject;
 	public:
-		using object_type = T;
+		using element_type = T;
 		T& operator*() {
 			return *get_value();
 		}
@@ -359,12 +359,12 @@ namespace 🍆 {
 	template<>
 	class has_journal<Integer> : public std::false_type {};
 
-	template<typename T, typename P, typename U = typename P::object_type>
+	template<typename T, typename P, typename U = typename P::element_type>
 	StrongObject<T> dcast(P o) {
 		return StrongObject<T>::dcast(StrongObject<U>(o));
 	}
 
-	template<typename T, typename P, typename U = typename P::object_type>
+	template<typename T, typename P, typename U = typename P::element_type>
 	StrongObject<T> scast(P o) {
 		return StrongObject<T>::scast(StrongObject<U>(o));
 	}

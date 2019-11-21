@@ -3,6 +3,7 @@ import "../stdlib/set.🍆"
 import "../stdlib/vector.🍆"
 import "../stdlib/rand.🍆"
 import "../stdlib/journal_tag.🍆"
+import "../stdlib/error.🍆"
 
 struct Main {
 	strong OutputStream out;
@@ -11,7 +12,7 @@ struct Main {
 	};
 	fun void main(){
 		var int tests = 1000;
-		var int size = 30;
+		var int size = 50;
 
 		for(var int test = 0; test < tests; test = test + 1) {
 			out.print_string("Test ");
@@ -21,20 +22,8 @@ struct Main {
 			auto history = new Vector<Integer>();
 			for(var int i = 0; i < size; i = i + 1) {
 				auto ii = new Integer(new RandInt(-100, 100).result);
-
-					ii.print(:out);
-					out.print_newline();
-
 				history.push_back(ii);
 				ints.insert(ii);
-
-
-					history.print(:out);
-					out.print_newline();
-					ints.print_structural(:out);
-					out.print_newline();
-					out.flush();
-
 				auto pre_check = new JournalTag<Vector<Integer>>(history);
 				history.sort(:new DefaultComparator<Integer>());
 				for(var int j = 0; j < history.size() - 1;) {
@@ -44,6 +33,7 @@ struct Main {
 						j = j + 1;
 					}
 				}
+				auto history_as_set = new JournalTag<Vector<Integer>>(history);
 				auto hb = history.begin();
 				auto sb = ints.begin();
 				auto valid = 1;
@@ -60,6 +50,39 @@ struct Main {
 				}
 				pre_check.bring_back();
 				if(!valid) {
+					history.print(:out);
+					out.print_newline();
+					ints.print_structural(:out);
+					out.print_newline();
+					return;
+				}
+			}
+			auto pre_check = new JournalTag<Vector<Integer>>(history);
+			for(var int x = 0; x < history.size(); x = x + 1) {
+				for(var int y = x + 1; y < history.size(); y = y + 1) {
+					if(history.at(x).eq(history.at(y))) {
+						history.erase(:history.get_iter(y));
+						y = y - 1;
+					}
+				}
+			}
+			var int valid = 1;
+			while(!history.empty()) {
+				ints.erase(history.pop_back());
+				if(ints.size() != history.size()) {
+					out.print_int(ints.size());
+					out.print_int(history.size());
+					out.flush();
+					auto a = new Error("dfg");
+					valid = 0;
+				}
+				for(var int x = 0; x < history.size(); x = x + 1) {
+					if(ints.find(history.at(x)).eq(ints.end())) {
+						valid = 0;
+					}
+				}
+				if(!valid) {
+					pre_check.bring_back();
 					history.print(:out);
 					out.print_newline();
 					ints.print_structural(:out);

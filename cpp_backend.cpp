@@ -348,7 +348,9 @@ public:
 			}
 		},
 		[&](const std::unique_ptr<VariableAuto>& s) {
-			print_data("auto var_", s->name);
+			print_data(u8"🍆::StrongObject<std::remove_reference_t<decltype(");
+			print_expression(s->value, parameters);
+			print_data(")>::element_type> var_", s->name);
 			print_data(" = ");
 			print_expression(s->value, parameters);
 			if(print_semicolon) {

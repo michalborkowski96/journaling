@@ -28,7 +28,15 @@ Set T : Container<T, AVLNode_<T>> {
 	} noeffect;
 	fun AVLNode_<T> find(T key) {
 		var AVLNode_<T> node = root_;
-		while(node != null && node != end_) {
+		while(node != null) {
+			if(node == end_) {
+				if(node.left_son != null) {
+					node = node.left_son;
+					continue;
+				} else {
+					break;
+				}
+			}
 			var T k = node.deref();
 			if(comparator_.eq(key, k)) {
 				return node;
@@ -81,6 +89,8 @@ Set T : Container<T, AVLNode_<T>> {
 	} noeffect;
 
 	fun void print_structural(OutputStream out){
+		out.print_int(size_);
+		out.print_string(" ");
 		print_structural_(root_, out);
 	} noeffect;
 
@@ -109,6 +119,10 @@ Set T : Container<T, AVLNode_<T>> {
 	} noeffect;
 
 	fun Pair<Integer, T> insert(T entry) {
+		return this.insert_(entry, :new AVLNode_<T>(null, null));
+	} auto;
+
+	fun Pair<Integer, T> insert_(T entry, AVLNode_<T> use_node) {
 		var AVLNode_<T> node = root_;
 		while(1) {
 			if(node == end_) {
@@ -116,7 +130,9 @@ Set T : Container<T, AVLNode_<T>> {
 					node = node.left_son;
 					continue;
 				} else {
-					node.left_son = new AVLNode_<T>(entry, node);
+					use_node.data = entry;
+					use_node.parent = node;
+					node.left_son = use_node;
 					node = node.left_son;
 					break;
 				}
@@ -131,7 +147,9 @@ Set T : Container<T, AVLNode_<T>> {
 				if(node.left_son != null) {
 					node = node.left_son;
 				} else {
-					node.left_son = new AVLNode_<T>(entry, node);
+					use_node.data = entry;
+					use_node.parent = node;
+					node.left_son = use_node;
 					node = node.left_son;
 					break;
 				}
@@ -139,7 +157,9 @@ Set T : Container<T, AVLNode_<T>> {
 				if(node.right_son != null) {
 					node = node.right_son;
 				} else {
-					node.right_son = new AVLNode_<T>(entry, node);
+					use_node.data = entry;
+					use_node.parent = node;
+					node.right_son = use_node;
 					node = node.right_son;
 					break;
 				}
@@ -148,21 +168,70 @@ Set T : Container<T, AVLNode_<T>> {
 		while(node != null) {
 			node = rebalance_(node);
 		}
+		size_ = size_ + 1;
 		return new Pair<Integer, T>(new Integer(0), null), entry, 0;
 	} dual (T old, int had_old) {
 		if(had_old) {
-			insert(old);
+			insert_(old, null);
 		} else {
 			erase(old);
 		}
 	};
 
 	fun Pair<Integer, T> erase(T key) {
-		var AVLNode_<T> node = find(key);
-		if(node.eq(end_)) {
-			return new Pair<Integer, T>(new Integer(0), null), null, 0;
+		return this.erase_iter(:find(key));
+	} auto;
+
+	fun void swap_(AVLNode_<T> a, AVLNode_<T> b) {
+		auto old_root = root_;
+
+		auto c = a.parent;
+		a.parent = b.parent;
+		b.parent = c;
+		if(a.parent != null) {
+			if(a.parent.left_son == b) {
+				a.parent.left_son = a;
+			} else {
+				a.parent.right_son = a;
+			}
+		} else {
+			root_ = a;
 		}
-		var T old = node.deref();
+		if(b.parent != null) {
+			if(b.parent.left_son == a) {
+				b.parent.left_son = b;
+			} else {
+				b.parent.right_son = b;
+			}
+		} else {
+			root_ = b;
+		}
+
+		c = a.right_son;
+		a.right_son = b.right_son;
+		b.right_son = c;
+		if(a.right_son != null) {
+			a.right_son.parent = a;
+		}
+		if(b.right_son != null) {
+			b.right_son.parent = b;
+		}
+
+		c = a.left_son;
+		a.left_son = b.left_son;
+		b.left_son = c;
+		if(a.left_son != null) {
+			a.left_son.parent = a;
+		}
+		if(b.left_son != null) {
+			b.left_son.parent = b;
+		}
+	} noeffect;
+
+	fun Pair<Integer, T> erase_iter(AVLNode_<T> node) {
+		if(node.eq(end_)) {
+			return new Pair<Integer, T>(new Integer(0), null), null, null;
+		}
 		if(node.left_son == null && node.right_son == null) {
 			if(node.parent.left_son == node) {
 				node.parent.left_son = null;
@@ -170,7 +239,8 @@ Set T : Container<T, AVLNode_<T>> {
 				node.parent.right_son = null;
 			}
 		} else if (node.left_son != null && node.right_son == null) {
-			if(node.parent) {
+			node.left_son.parent = node.parent;
+			if(node.parent != null) {
 				if(node.parent.left_son == node) {
 					node.parent.left_son = node.left_son;
 				} else {
@@ -180,7 +250,8 @@ Set T : Container<T, AVLNode_<T>> {
 				root_ = node.left_son;
 			}
 		} else if (node.left_son == null && node.right_son != null) {
-			if(node.parent) {
+			node.right_son.parent = node.parent;
+			if(node.parent != null) {
 				if(node.parent.left_son == node) {
 					node.parent.left_son = node.right_son;
 				} else {
@@ -190,24 +261,25 @@ Set T : Container<T, AVLNode_<T>> {
 				root_ = node.right_son;
 			}
 		} else {
-			var AVLNode_<T> to_remove;
-			to_remove = node.next();
-			node.data = to_remove.deref();
-			if(to_remove.parent.left_son == to_remove) {
-				to_remove.parent.left_son = null;
-			} else {
-				to_remove.parent.right_son = null;
-			}
-			node = to_remove;
+			swap_(node, node.next());
+			return this.erase_iter(:node), null, null;
 		}
+		var T old = node.deref();
+		auto old_node = node;
 		node = node.parent;
 		while(node != null) {
 			node = rebalance_(node);
 		}
-		return new Pair<Integer, T>(new Integer(1), old), old, 1;
-	} dual (T old, int had_old) {
-		if(had_old) {
-			insert(old);
+		old_node.data = null;
+		old_node.height = null;
+		old_node.parent = null;
+		old_node.left_son = null;
+		old_node.right_son = null;
+		size_ = size_ - 1;
+		return new Pair<Integer, T>(new Integer(1), old), old, old_node;
+	} dual (T old, AVLNode_<T> use_node) {
+		if(use_node != null) {
+			insert_(old, use_node);
 		}
 	};
 }

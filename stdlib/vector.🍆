@@ -80,23 +80,19 @@ Vector T : OrderedContainer<T, VectorIterator_<T>> {
 	fun void push_back_(T element) {
 		array_.push_back(element);
 	} dual () {
-		pop_back_();
+		pop_back();
 	};
 
 	fun void push_back(T element) {
 		this.push_back_(element);
 	} auto;
 
-	fun T pop_back_() {
+	fun T pop_back() {
 		var T el = array_.pop_back();
 		return el, el;
 	} dual (T el) {
 		push_back_(el);
 	};
-
-	fun void pop_back() {
-		this.pop_back_();
-	} auto;
 
 	fun VectorIterator_<T> insert(VectorIterator_<T> iter, T element) {
 		var int target = iter.index_;
@@ -111,7 +107,7 @@ Vector T : OrderedContainer<T, VectorIterator_<T>> {
 		for(var int i = iter.index_; i < size() - 1; i = i + 1) {
 			swap_index(i, i + 1);
 		}
-		return iter, iter, pop_back_();
+		return iter, iter, pop_back();
 	} dual;
 }
 

@@ -109,16 +109,20 @@ abstract OrderedContainer Element Iterator : Container<Element, Iterator> {
 		this.insert(:end(), e);
 	} auto;
 
-	fun void pop_back() {
+	fun Element pop_back() {
+		var Element e = end().prev().deref();
 		this.erase(:end().prev());
+		return e;
 	} auto;
 
 	fun void push_front(Element e) {
 		this.insert(:begin(), e);
 	} auto;
 
-	fun void pop_front() {
+	fun Element pop_front() {
+		var Element e = begin().deref();
 		this.erase(:begin());
+		return e;
 	} auto;
 
 	fun void resize(int new_size, Element el) {

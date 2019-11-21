@@ -42,6 +42,9 @@ namespace {
 			last_block = get_last_block();
 			object = last_block->pointer.object_pointer;
 		}
+		size_t get_shared_count() const {
+			return shared_count;
+		}
 		void increase_shared_count(){
 			++shared_count;
 		}
@@ -116,7 +119,11 @@ class GroupSharedPointer {
 	friend class GroupWeakPointer<T>;
 	GroupSharedPointer(ControlBlock<T>* control_block) : control_block(control_block) {
 		if(control_block) {
-			control_block->increase_shared_count();
+			if(control_block->get_shared_count() > 0) {
+				control_block->increase_shared_count();
+			} else {
+				this->control_block = nullptr;
+			}
 		}
 	}
 public:
