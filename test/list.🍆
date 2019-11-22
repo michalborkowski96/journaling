@@ -5,27 +5,27 @@ struct Main {
 	strong OutputStream out;
 	fun int sum_list(List<Integer> l) {
 		out.print_string("Start sum_list with ");
-		l.print(:out);
+		l.print(out);
 		out.print_newline();
 		var int sum = 0;
 		for(auto it = l.begin(); !it.eq(l.end()); it = it.next()) {
 			sum = sum + it.deref().to_int();
 		}
 		out.print_string("Done sum_list with ");
-		l.print(:out);
+		l.print(out);
 		out.print_newline();
 		return sum;
 	};
 	fun Integer sum_listI(List<Integer> l) {
 		out.print_string("Start sum_listI with ");
-		l.print(:out);
+		l.print(out);
 		out.print_newline();
 		var Integer sum = new Integer(0);
 		for(auto it = l.begin(); !it.eq(l.end()); it = it.next()) {
 			sum = sum + it.deref();
 		}
 		out.print_string("Done sum_listI with ");
-		l.print(:out);
+		l.print(out);
 		out.print_newline();
 		return sum;
 	};
@@ -33,7 +33,7 @@ struct Main {
 		out.print_string("Ints size: ");
 		out.print_int(ints.size());
 		out.print_newline();
-		ints.print(:out);
+		ints.print(out);
 		out.print_newline();
 	};
 	fun void test1(){
@@ -56,7 +56,7 @@ struct Main {
 		out.print_int_ln(sum0);
 		print_ints_info(ints);
 		out.print_string("Sum1: ");
-		sum1.print(:out);
+		sum1.print(out);
 		out.print_newline();
 		print_ints_info(ints);
 	};
@@ -95,7 +95,7 @@ struct Main {
 		ints.push_back(-5);
 		ints.push_back(77);
 		var int u = lazy_print[ints];
-		ints.sort(:new DefaultComparator<int>());
+		ints.sort(new DefaultComparator<int>());
 		eval(lazy_print(ints));
 		eval(u);
 		eval(lazy_print(ints));
@@ -103,7 +103,7 @@ struct Main {
 		out.print_newline();
 
 		u = lazy_print[ints];
-		ints.insert(:ints.begin().next().next().next(), 666);
+		ints.insert(ints.begin().next().next().next(), 666);
 		eval(lazy_print(ints));
 		eval(u);
 		eval(lazy_print(ints));

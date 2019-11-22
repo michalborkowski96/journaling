@@ -57,14 +57,14 @@ public: \
 	virtual 🍆::StrongObject<🍆::Integer> fun_eq(🍆::StrongObject<Type_String> var_s) { \
 		return std::get<0>(basefun_eq(var_s)); \
 	} \
-	auto basefun_get(🍆::StrongObject<🍆::Integer> var_i) { \
+	auto basefun_at(🍆::StrongObject<🍆::Integer> var_i) { \
 		return std::make_tuple(🍆::StrongObject<Integer>(data[var_i->to_ll()])); \
 	} \
-	virtual 🍆::StrongObject<🍆::Integer> privfun_get(🍆::StrongObject<🍆::Integer> var_i) { \
-		return std::get<0>(basefun_get(var_i)); \
+	virtual 🍆::StrongObject<🍆::Integer> privfun_at(🍆::StrongObject<🍆::Integer> var_i) { \
+		return std::get<0>(basefun_at(var_i)); \
 	} \
-	virtual 🍆::StrongObject<🍆::Integer> fun_get(🍆::StrongObject<🍆::Integer> var_i) { \
-		return std::get<0>(basefun_get(var_i)); \
+	virtual 🍆::StrongObject<🍆::Integer> fun_at(🍆::StrongObject<🍆::Integer> var_i) { \
+		return std::get<0>(basefun_at(var_i)); \
 	} \
 	auto basefun_le(🍆::StrongObject<Type_String> var_s) { \
 		return std::make_tuple(🍆::StrongObject<Integer>(data <= var_s->data)); \
@@ -141,10 +141,10 @@ public: \
 	auto basefun_substr(🍆::StrongObject<🍆::Integer> var_pos, 🍆::StrongObject<🍆::Integer> var_len) { \
 		return std::make_tuple(🍆::make_object<Type_String>(data.substr(var_pos->to_ll(), var_len->to_ll()))); \
 	} \
-	virtual void privfun_substr(🍆::StrongObject<🍆::Integer> var_pos, 🍆::StrongObject<🍆::Integer> var_len) { \
-		(basefun_substr(var_pos, var_len)); \
+	virtual 🍆::StrongObject<Type_String> privfun_substr(🍆::StrongObject<🍆::Integer> var_pos, 🍆::StrongObject<🍆::Integer> var_len) { \
+		return std::get<0>(basefun_substr(var_pos, var_len)); \
 	} \
-	virtual void fun_substr(🍆::StrongObject<🍆::Integer> var_pos, 🍆::StrongObject<🍆::Integer> var_len) { \
-		(basefun_substr(var_pos, var_len)); \
+	virtual 🍆::StrongObject<Type_String> fun_substr(🍆::StrongObject<🍆::Integer> var_pos, 🍆::StrongObject<🍆::Integer> var_len) { \
+		return std::get<0>(basefun_substr(var_pos, var_len)); \
 	} \
 };

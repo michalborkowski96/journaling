@@ -1,12 +1,12 @@
 nojournal String {
-	fun int get(int i) {return null;};
+	fun int at(int i) {return null;};
 	fun void set(int i, int char) {};
 	fun int size() {return null;};
 	fun void resize(int new_size, int char) {};
 	fun void clear() {};
 	fun int empty() {return null;};
 	fun void append(String s){};
-	fun void substr(int pos, int len) {};
+	fun String substr(int pos, int len) {return null;};
 
 	fun String add(String s) {return null;};
 

@@ -210,7 +210,7 @@ public:
 
 				for(size_t i = 0; i < e->arguments.size(); ++i) {
 					print_data(", ");
-					print_expression(e->arguments[i].first, parameters);
+					print_expression(e->arguments[i], parameters);
 				}
 
 				print_data(")");
@@ -228,10 +228,10 @@ public:
 				), e->function);
 				print_data("(");
 				if(!e->arguments.empty()) {
-					print_expression(e->arguments[0].first, parameters);
+					print_expression(e->arguments[0], parameters);
 					for(size_t i = 1; i < e->arguments.size(); ++i) {
 						print_data(", ");
-						print_expression(e->arguments[i].first, parameters);
+						print_expression(e->arguments[i], parameters);
 					}
 				}
 				print_data(")");

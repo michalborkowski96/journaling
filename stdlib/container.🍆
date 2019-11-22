@@ -81,12 +81,12 @@ abstract Container Element Iterator {
 		var Iterator i = begin();
 		o.print_string("{");
 		if(!i.eq(end())) {
-			i.deref().print(:o);
+			i.deref().print(o);
 			i = i.next();
 		}
 		while(!i.eq(end())) {
 			o.print_string(", ");
-			i.deref().print(:o);
+			i.deref().print(o);
 			i = i.next();
 		}
 		o.print_string("}");
@@ -106,22 +106,22 @@ abstract OrderedContainer Element Iterator : Container<Element, Iterator> {
 	};
 
 	fun void push_back(Element e) {
-		this.insert(:end(), e);
+		this.insert(end(), e);
 	} auto;
 
 	fun Element pop_back() {
 		var Element e = end().prev().deref();
-		this.erase(:end().prev());
+		this.erase(end().prev());
 		return e;
 	} auto;
 
 	fun void push_front(Element e) {
-		this.insert(:begin(), e);
+		this.insert(begin(), e);
 	} auto;
 
 	fun Element pop_front() {
 		var Element e = begin().deref();
-		this.erase(:begin());
+		this.erase(begin());
 		return e;
 	} auto;
 
@@ -142,11 +142,11 @@ abstract OrderedContainer Element Iterator : Container<Element, Iterator> {
 		for(var Iterator e1 = begin(); !e1.eq(end()); e1 = e1.next()) {
 			for(var Iterator e2 = e1.next(); !e2.eq(end()); e2 = e2.next()) {
 				if(comp.less(e2.deref(), e1.deref())) {
-					this.swap(:e1, :e2);
-					/*this.insert(:e1, e2.deref());
-					this.insert(:e2, e1.deref());
-					e1 = this.erase(:e1).prev();
-					e2 = this.erase(:e2).prev();*/
+					this.swap(e1, e2);
+					/*this.insert(e1, e2.deref());
+					this.insert(e2, e1.deref());
+					e1 = this.erase(e1).prev();
+					e2 = this.erase(e2).prev();*/
 				}
 			}
 		}

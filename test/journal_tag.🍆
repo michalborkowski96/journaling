@@ -15,21 +15,21 @@ struct Main {
 	fun void main(){
 		var List<Integer> list = new List<Integer>();
 		list.push_back(new Integer(1));
-		list.print(:out);
+		list.print(out);
 		out.print_newline();
 		var JournalTag<List<Integer>> s = new JournalTag<List<Integer>>(list);
 		list.push_back(new Integer(2));
-		list.print(:out);
+		list.print(out);
 		out.print_newline();
 		var JournalTag<List<Integer>> s2 = new JournalTag<List<Integer>>(list);
 		s.bring_back();
-		list.print(:out);
+		list.print(out);
 		out.print_newline();
 		list.push_back(new Integer(3));
-		list.print(:out);
+		list.print(out);
 		out.print_newline();
 		s2.bring_back();
-		list.print(:out);
+		list.print(out);
 		out.print_newline();
 	};
 }

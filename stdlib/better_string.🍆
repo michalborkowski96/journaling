@@ -1,0 +1,91 @@
+import "streamdef_.🍆"
+import "string.🍆"
+
+BetterString {
+	strong String str;
+	fun String get_str_(){
+		return str;
+	} noeffect;
+	constructor() {
+		str = new String();
+	};
+	constructor(String string) {
+		str = string;
+	};
+	fun int at(int i) {
+		return str.at(i);
+	} noeffect;
+	fun void set(int i, int char) {
+		var int old = str.at(i);
+		str.set(i, char);
+		return i, old;
+	} dual (int i, int char) {
+		str.set(i, char);
+	};
+	fun int size() {
+		return str.size();
+	} noeffect;
+	fun void resize(int new_size, int char) {
+		var int ssize = str.size();
+		if(new_size <= ssize) {
+			var String s = str.substr(new_size, ssize - new_size);
+			str.resize(new_size, char);
+			return s, 0;
+		} else {
+			str.resize(new_size, char);
+			return null, ssize;
+		}
+	} dual (String s, int ssize) {
+		if(s == null) {
+			str.resize(ssize, 0);
+		} else {
+			str.append(s);
+		}
+	};
+	fun void clear() {
+		var String old = str;
+		str = new String();
+		return old;
+	} dual (String old) {
+		str = old;
+	};
+	fun int empty() {
+		return str.empty();
+	} noeffect;
+	fun void append(String s) {
+		var int ssize = str.size();
+		str.append(s);
+		return ssize;
+	} dual (int ssize) {
+		str.resize(ssize, 0);
+	};
+	fun void substr(int pos, int len) {
+		str.resize(pos, len);
+	} noeffect;
+
+	fun BetterString add(BetterString s) {
+		return new BetterString(str + s.get_str_());
+	} noeffect;
+
+	fun int less(BetterString s) {
+		return str < s.get_str_();
+	} noeffect;
+	fun int more(BetterString s) {
+		return str > s.get_str_();
+	} noeffect;
+	fun int eq(BetterString s) {
+		return str.eq(s.get_str_());
+	} noeffect;
+	fun int neq(BetterString s) {
+		return str.neq(s.get_str_());
+	} noeffect;
+	fun int le(BetterString s) {
+		return str <= s.get_str_();
+	} noeffect;
+	fun int me(BetterString s) {
+		return str >= s.get_str_();
+	} noeffect;
+	fun void print(OutputStream o) {
+		o.print_string(str);
+	} noeffect;
+}

@@ -709,6 +709,11 @@ namespace 🍆 {
 		return obj;
 	}
 
+	template<typename T>
+	StrongObject<T> strongify(WeakObject<T> obj){
+		return obj;
+	}
+
 	template<typename T, typename F, typename... Args>
 	std::invoke_result_t<F, StrongObject<T>, Args...> lazy_call(StrongObject<T> obj, F function, Args&&... args) {
 		return Journal::lazy_call(obj, std::move(function), args...);

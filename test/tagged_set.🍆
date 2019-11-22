@@ -1,0 +1,78 @@
+import "../stdlib/integer.🍆"
+import "../stdlib/vector.🍆"
+import "../stdlib/set.🍆"
+import "../stdlib/journal_tag.🍆"
+import "../stdlib/better_string.🍆"
+
+struct Main {
+	strong OutputStream out;
+	constructor(){
+		out = new StdOut();
+	};
+	fun void main(){
+		{
+			auto ints = new Set<Integer>(new DefaultComparator<Integer>());
+			ints.insert(new Integer(1));
+			ints.insert(new Integer(2));
+			auto tag = new JournalTag<Set<Integer>>(ints);
+			ints.insert(new Integer(3));
+			ints.insert(new Integer(3));
+			ints.insert(new Integer(4));
+			ints.erase(new Integer(2));
+			ints.erase(new Integer(3));
+			auto tag2 = new JournalTag<Set<Integer>>(ints);
+			ints.print(out);
+			out.print_newline();
+			tag.bring_back();
+			ints.print(out);
+			out.print_newline();
+			tag2.bring_back();
+			ints.print(out);
+			out.print_newline();
+		}
+
+		out.print_newline();
+
+		{
+			auto strings = new Set<BetterString>(new DefaultComparator<BetterString>());
+			auto t = new JournalTag<Set<BetterString>>(strings);
+			var BetterString bs1 = new BetterString("bb");
+			strings.insert(bs1);
+			strings.insert(new BetterString("cc"));
+			strings.insert(new BetterString("dd"));
+			strings.print(out);
+			out.print_newline();
+			bs1.set(0, 'e');
+			bs1.set(1, 'e');
+			strings.print(out);
+			out.print_newline();
+			strings.insert(new BetterString("aa"));
+			strings.print(out);
+			out.print_newline();
+			strings.insert(new BetterString("ee"));
+			strings.print(out);
+			out.print_newline();
+			bs1 = new BetterString("bb");
+			strings.insert(bs1);
+			strings.print(out);
+			out.print_newline();
+			bs1.set(0, 'e');
+			bs1.set(1, 'e');
+			strings.print(out);
+			out.print_newline();
+			strings.erase(new BetterString("bb"));
+			strings.print(out);
+			out.print_newline();
+			strings.erase(new BetterString("ee"));
+			strings.print(out);
+			out.print_newline();
+			auto tt = new JournalTag<Set<BetterString>>(strings);
+			t.bring_back();
+			strings.print(out);
+			out.print_newline();
+			tt.bring_back();
+			strings.print(out);
+			out.print_newline();
+		}
+	};
+}

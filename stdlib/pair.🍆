@@ -1,39 +1,56 @@
-struct Pair T U {
+Pair T U {
 	strong T first;
 	strong U second;
 	constructor(T f, U s) {
 		first = f;
 		second = s;
 	};
+	fun T get_first() {
+		return first;
+	} noeffect;
+	fun U get_second() {
+		return second;
+	} noeffect;
+	fun void set_first(T f) {
+		auto o = first;
+		first = f;
+		return o;
+	} dual (T f) {
+		set_first(f);
+	};
+	fun void set_second(U s) {
+		auto o = second;
+		second = s;
+		return o;
+	} dual (U s) {
+		set_second(s);
+	};
 	optional {
 		fun int less(Pair o) {
-			if(first < o.first) {
+			if(first < o.get_first()) {
 				return 1;
 			}
-			if(o.first < first) {
+			if(o.get_first() < first) {
 				return 0;
 			}
-			if(second < o.second) {
-				return 1;
-			}
-			return 0;
-		};
+			return second < o.get_second();
+		} noeffect;
 	}
 	optional {
 		fun int eq(Pair o) {
-			return first == o.first && second == o.second;
-		};
+			return first == o.get_first() && second == o.get_second();
+		} noeffect;
 		fun int neq(Pair o) {
 			return !eq(o);
-		};
+		} noeffect;
 	}
 	optional {
 		fun void print(OutputStream o) {
 			o.print_string("{");
-			first.print(:o);
+			first.print(o);
 			o.print_string(", ");
-			second.print(:o);
+			second.print(o);
 			o.print_string("}");
-		};
+		} noeffect;
 	}
 }

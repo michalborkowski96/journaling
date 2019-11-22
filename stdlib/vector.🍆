@@ -19,6 +19,10 @@ struct VectorIterator_ T {
 		return array_.at(index_);
 	};
 
+	fun void set(T el){
+		array_.set(index_, el);
+	};
+
 	fun int eq(VectorIterator_ that) {
 		return index_ == that.index_;
 	};

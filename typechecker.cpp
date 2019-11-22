@@ -1115,7 +1115,7 @@ std::optional<ExpressionCheckResult> check_expression(std::vector<TypeError>& er
 		if(!t) {
 			return std::nullopt;
 		}
-		for(const auto&[expr, is_non_journal] : e->arguments) {
+		for(const auto& expr : e->arguments) {
 			auto tt = check_expr(expr);
 			if(tt) {
 				args.push_back(std::move(tt->type_info()));
@@ -1126,45 +1126,8 @@ std::optional<ExpressionCheckResult> check_expression(std::vector<TypeError>& er
 		}
 		auto result = t->type_info()->call_with(args);
 		if(result) {
-			bool requires_call_nojournal_marks;
-			bool forbids_call_nojournal_marks;
-			if(auto fun = dynamic_cast<const FunctionalTypeInfo*>(t->type_info())) {
-				requires_call_nojournal_marks = fun->requires_call_nojournal_marks();
-				forbids_call_nojournal_marks = fun->forbids_call_nojournal_marks();
-			} else if (dynamic_cast<const TemplateUnknownTypeInfo*>(t->type_info())) {
-				requires_call_nojournal_marks = false;
-				forbids_call_nojournal_marks = false;
-			} else {
-				throw std::runtime_error("Internal error.");
-			}
-			bool error = false;
-			if(requires_call_nojournal_marks) {
-				for(size_t i = 0; i < args.size(); ++i) {
-					if(!args[i]->check_nojournal_mark(e->arguments[i].second)) {
-						if(e->arguments[i].second) {
-							errors.emplace_back(e->arguments[i].first, "Expression marked as non-journalable, but type supports journaling.");
-						} else {
-							errors.emplace_back(e->arguments[i].first, "Type doesn't support journaling. If you know what you're doing use the ':' mark to silence this error.");
-						}
-						error = true;
-					}
-				}
-			}
-			if(forbids_call_nojournal_marks) {
-				for(const auto&[expr, is_non_journal] : e->arguments) {
-					if(is_non_journal) {
-						errors.emplace_back(expr, "Expression marked as non-journalable in a call for a function that forbids marks.");
-						error = true;
-					}
-				}
-			}
-			if(error) {
-				return std::nullopt;
-			}
 			return ExpressionCheckResult(*result, false);
 		}
-
-
 		errors.emplace_back(*e, "Type " + t->type_info()->full_name() + " cannot be called with (" + types_to_string(args) + ").");
 		return std::nullopt;
 	},

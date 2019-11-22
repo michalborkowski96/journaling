@@ -4,7 +4,7 @@ import "../stdlib/vector.🍆"
 struct Main {
 	strong OutputStream out;
 	fun int lazy_print(Vector<Integer> l) {
-		l.print(:out);
+		l.print(out);
 		out.print_newline();
 		return 0;
 	};
@@ -26,7 +26,7 @@ struct Main {
 		ints.push_back(new Integer(-5));
 		ints.push_back(new Integer(77));
 		var int u = lazy_print[ints];
-		ints.sort(:new DefaultComparator<Integer>());
+		ints.sort(new DefaultComparator<Integer>());
 		eval(lazy_print(ints));
 		eval(u);
 		eval(lazy_print(ints));
@@ -34,7 +34,7 @@ struct Main {
 		out.print_newline();
 
 		u = lazy_print[ints];
-		ints.insert(:ints.get_iter(ints.size() / 2), new Integer(666));
+		ints.insert(ints.get_iter(ints.size() / 2), new Integer(666));
 		eval(lazy_print(ints));
 		eval(u);
 		eval(lazy_print(ints));

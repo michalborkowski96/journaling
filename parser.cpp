@@ -82,30 +82,12 @@ namespace {
 			return expect<0>(expected_tokens...);
 		}
 
-		std::vector<Expression> parse_call_arguments() {
-			check_for_tokens(LexemeType::BRACKET_OPEN);
-			++pos;
-			std::vector<Expression> args;
-			while(tokens[pos].type != LexemeType::BRACKET_CLOSE) {
-				args.push_back(parse_expression());
-				if(tokens[pos].type == LexemeType::COMMA && tokens[pos + 1].type != LexemeType::BRACKET_CLOSE) {
-					++pos;
-				}
-			}
-			++pos;
-			return args;
-		}
-
-		std::vector<std::pair<Expression, bool>> parse_lazy_call_arguments(bool expect_round_bracket = false) {
+		std::vector<Expression> parse_call_arguments(bool expect_round_bracket) {
 			check_for_tokens(expect_round_bracket ? LexemeType::BRACKET_OPEN : LexemeType::SQUARE_OPEN);
 			++pos;
-			std::vector<std::pair<Expression, bool>> args;
+			std::vector<Expression> args;
 			while(tokens[pos].type != (expect_round_bracket ? LexemeType::BRACKET_CLOSE : LexemeType::SQUARE_CLOSE)) {
-				bool marked = tokens[pos].type == LexemeType::COLON;
-				if(marked) {
-					++pos;
-				}
-				args.push_back(make_pair(parse_expression(), marked));
+				args.push_back(parse_expression());
 				if(tokens[pos].type == LexemeType::COMMA && tokens[pos + 1].type != (expect_round_bracket ? LexemeType::BRACKET_CLOSE : LexemeType::SQUARE_CLOSE)) {
 					++pos;
 				}
@@ -162,7 +144,7 @@ namespace {
 			LexemeType::NEW, [&]() {
 				++pos;
 				PointerType type = parse_pointer_type();
-				std::vector<Expression> arguments = parse_call_arguments();
+				std::vector<Expression> arguments = parse_call_arguments(true);
 				expression = std::make_unique<New>(begin, tokens[pos - 1].end, std::move(type), move(arguments));
 			},
 			LexemeType::SUB, [&]() {
@@ -202,11 +184,11 @@ namespace {
 			while(
 				expect(
 				LexemeType::BRACKET_OPEN, [&](){
-					std::vector<std::pair<Expression, bool>> args = parse_lazy_call_arguments(true);
+					std::vector<Expression> args = parse_call_arguments(true);
 					expression = std::make_unique<FunctionCall>(begin, tokens[pos - 1].end, std::move(*expression), move(args), false);
 				},
 				LexemeType::SQUARE_OPEN, [&](){
-					std::vector<std::pair<Expression, bool>> args = parse_lazy_call_arguments();
+					std::vector<Expression> args = parse_call_arguments(false);
 					expression = std::make_unique<FunctionCall>(begin, tokens[pos - 1].end, std::move(*expression), move(args), true);
 				},
 				LexemeType::DOT, [&](){
@@ -553,7 +535,7 @@ namespace {
 			std::vector<std::pair<VariableType, Identifier>> arguments = parse_function_declaration_args();
 			std::optional<std::vector<expression::Expression>> superclass_call;
 			if(tokens[pos].type == LexemeType::BRACKET_OPEN) {
-				superclass_call = parse_call_arguments();
+				superclass_call = parse_call_arguments(true);
 			}
 			std::unique_ptr<Block> body = std::make_unique<Block>(parse_block());
 			check_for_tokens(LexemeType::SEMICOLON);

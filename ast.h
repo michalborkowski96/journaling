@@ -106,9 +106,9 @@ namespace ast {
 
 		struct FunctionCall : public AstNode {
 			Expression function;
-			std::vector<std::pair<Expression, bool>> arguments;
+			std::vector<Expression> arguments;
 			bool lazy;
-			FunctionCall(size_t begin, size_t end, Expression function, std::vector<std::pair<Expression, bool>>&& arguments, bool lazy);
+			FunctionCall(size_t begin, size_t end, Expression function, std::vector<Expression>&& arguments, bool lazy);
 		};
 
 		struct Cast : public AstNode {

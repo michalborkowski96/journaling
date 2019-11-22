@@ -31,7 +31,7 @@ List T : OrderedContainer<T, ListElement_<T>> {
 	} dual;
 
 	fun ListElement_<T> insert(ListElement_<T> iter, T element) {
-		return this.insert_(:iter, element, :new ListElement_<T>(null, null, null));
+		return this.insert_(iter, element, new ListElement_<T>(null, null, null));
 	} auto;
 
 	fun ListElement_<T> insert_(ListElement_<T> iter, T element, ListElement_<T> use_iter) {

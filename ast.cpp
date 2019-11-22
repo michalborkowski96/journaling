@@ -30,7 +30,7 @@ IntegerLiteral::IntegerLiteral(size_t begin, size_t end, Integer value) : AstNod
 
 MemberAccess::MemberAccess(size_t begin, size_t end, Expression object, Identifier&& member) : AstNode(begin, end), object(std::move(object)), member(std::move(member)) {}
 
-FunctionCall::FunctionCall(size_t begin, size_t end, Expression function, std::vector<std::pair<Expression, bool>>&& arguments, bool lazy) : AstNode(begin, end), function(std::move(function)), arguments(std::move(arguments)), lazy(lazy) {}
+FunctionCall::FunctionCall(size_t begin, size_t end, Expression function, std::vector<Expression>&& arguments, bool lazy) : AstNode(begin, end), function(std::move(function)), arguments(std::move(arguments)), lazy(lazy) {}
 
 Cast::Cast(size_t begin, size_t end, PointerType&& target_type, Expression value) : AstNode(begin, end), target_type(std::move(target_type)), value(std::move(value)) {}
 

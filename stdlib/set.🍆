@@ -1,6 +1,7 @@
 import "container.🍆"
 import "avl_.🍆"
 import "integer.🍆"
+import "journal_tag.🍆"
 import "pair.🍆"
 
 UntaggedSet T : Container<T, AVLNode_<T>> {
@@ -58,7 +59,7 @@ UntaggedSet T : Container<T, AVLNode_<T>> {
 			return;
 		}
 		if(node.deref() != null) {
-			node.deref().print(:out);
+			node.deref().print(out);
 		out.flush();
 		} else {
 			out.print_string("null");
@@ -72,7 +73,7 @@ UntaggedSet T : Container<T, AVLNode_<T>> {
 		out.flush();
 		if(node.parent != null) {
 			if(node.parent.deref() != null) {
-				node.parent.deref().print(:out);
+				node.parent.deref().print(out);
 		out.flush();
 			} else {
 				out.print_string("null");
@@ -123,7 +124,7 @@ UntaggedSet T : Container<T, AVLNode_<T>> {
 	} noeffect;
 
 	fun Pair<Integer, T> insert(T entry) {
-		return this.insert_(entry, :new AVLNode_<T>(null, null));
+		return this.insert_(entry, new AVLNode_<T>(null, null));
 	} auto;
 
 	fun Pair<Integer, T> insert_(T entry, AVLNode_<T> use_node) {
@@ -183,7 +184,7 @@ UntaggedSet T : Container<T, AVLNode_<T>> {
 	};
 
 	fun Pair<Integer, T> erase(T key) {
-		return this.erase_iter(:find(key));
+		return this.erase_iter(find(key));
 	} auto;
 
 	fun void swap_(AVLNode_<T> a, AVLNode_<T> b) {
@@ -285,6 +286,124 @@ UntaggedSet T : Container<T, AVLNode_<T>> {
 		size_ = size_ - 1;
 		return new Pair<Integer, T>(new Integer(1), old), old, old_node;
 	} dual (T old, AVLNode_<T> use_node) {
+		if(use_node != null) {
+			insert_(old, use_node);
+		}
+	};
+}
+
+struct SetBox_ T { /*silence optional errors*/
+	strong T data;
+	fun void print(OutputStream o) {};
+	fun int less(SetBox_ T) {return 0;};
+	constructor(T d) {
+		data = d;
+	};
+}
+
+struct SetIterator_ T {
+	weak AVLNode_<Pair<SetBox_<JournalTag<T>>, T>> node_;
+	constructor(AVLNode_<Pair<SetBox_<JournalTag<T>>, T>> node) {
+		node_ = node;
+	};
+	fun T deref(){
+		return node_.deref().get_second();
+	};
+
+	fun void set(T element){
+		node_.deref().get_first().data = new JournalTag<T>(element);
+		node_.deref().set_second(element);
+	};
+
+	fun SetIterator_ next() {
+		return new SetIterator_(node_.next());
+	};
+
+	fun SetIterator_ prev() {
+		return new SetIterator_(node_.prev());
+	};
+
+	fun int eq(SetIterator_ that) {
+		return node_.eq(that.node_);
+	};
+
+	fun int neq(SetIterator_ that) {
+		return node_.neq(that.node_);
+	};
+	fun JournalTag<T> tag(){
+		return node_.deref().get_first().data;
+	};
+}
+
+nojournal SetComparator_ T : Comparator<Pair<SetBox_<JournalTag<T>>, T>> {
+	strong Comparator<T> orig_comparator_;
+	constructor(Comparator<T> c)(){
+		orig_comparator_ = c;
+	};
+	fun int less(Pair<SetBox_<JournalTag<T>>, T> a, Pair<SetBox_<JournalTag<T>>, T> b) {
+		auto at = new JournalTag<T>(a.get_second());
+		auto bt = new JournalTag<T>(b.get_second());
+		a.get_first().data.bring_back();
+		b.get_first().data.bring_back();
+		var int result = orig_comparator_.less(a.get_second(), b.get_second());
+		at.bring_back();
+		bt.bring_back();
+		return result;
+	};
+}
+
+Set T : Container<T, SetIterator_<T>> {
+	strong UntaggedSet<Pair<SetBox_<JournalTag<T>>, T>> set_;
+	fun int size() {
+		return set_.size();
+	} noeffect;
+	constructor(Comparator<T> c)() {
+		set_ = new UntaggedSet<Pair<SetBox_<JournalTag<T>>, T>>(new SetComparator_<T>(c));
+	};
+	fun SetIterator_<T> begin() {
+		return new SetIterator_<T>(set_.begin());
+	} noeffect;
+	fun SetIterator_<T> end() {
+		return new SetIterator_<T>(set_.end());
+	} noeffect;
+	fun SetIterator_<T> find(T key) {
+		return new SetIterator_<T>(set_.find(new Pair<SetBox_<JournalTag<T>>, T>(new SetBox_<JournalTag<T>>(new JournalTag<T>(key)), key)));
+	} noeffect;
+	fun Pair<Integer, T> insert(T entry) {
+		return this.insert_(new Pair<SetBox_<JournalTag<T>>, T>(new SetBox_<JournalTag<T>>(new JournalTag<T>(entry)), entry), new AVLNode_<Pair<SetBox_<JournalTag<T>>, T>>(null, null));
+	} auto;
+	fun Pair<Integer, T> insert_(Pair<SetBox_<JournalTag<T>>, T> entry, AVLNode_<Pair<SetBox_<JournalTag<T>>, T>> use_node) {
+		auto r = set_.insert_(entry, use_node);
+		auto rr = r.get_second();
+		if(rr == null) {
+			return new Pair<Integer, T>(r.get_first(), null), entry, 0;
+		} else {
+			return new Pair<Integer, T>(r.get_first(), rr.get_second()), rr, 1;
+		}
+	} dual (Pair<SetBox_<JournalTag<T>>, T> t, int had_old) {
+		if(had_old) {
+			set_.insert_(t, null);
+		} else {
+			set_.erase_iter(set_.find(t));
+		}
+	};
+	fun Pair<Integer, T> erase(T key) {
+		return this.erase_iter(find(key));
+	} auto;
+	fun Pair<Integer, T> erase_iter(SetIterator_<T> node) {
+		auto n = node.node_;
+		if(n.eq(set_.end())) {
+			return new Pair<Integer, T>(new Integer(0), null), null, null;
+		}
+		auto v = node.node_.deref();
+		auto r = set_.erase_iter(n);
+		auto rr = r.get_second();
+		if(rr == null) {
+			return new Pair<Integer, T>(r.get_first(), null), null, null;
+		} else {
+			return new Pair<Integer, T>(r.get_first(), rr.get_second()), v, n;
+		}
+	} dual (Pair<SetBox_<JournalTag<T>>, T> old, AVLNode_<Pair<SetBox_<JournalTag<T>>, T>> use_node) {
 		if(use_node != null) {
 			insert_(old, use_node);
 		}
