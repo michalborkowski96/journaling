@@ -1,10 +1,6 @@
-JournalTag_ T {
-	fun void t(T tt){t(tt);} noeffect;
-}
+JournalTag_ T : T {}
 
 nojournal JournalTag T {
-	fun void t_(JournalTag_<T> ttt, T tt){ttt.t(tt);}; /*only accept journalable types*/
-
-	constructor(T t){};
+	constructor(T t){var JournalTag_<T> tt;/*only accept journalable types*/};
 	fun void bring_back(){};
 }

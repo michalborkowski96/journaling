@@ -478,6 +478,9 @@ public:
 	virtual bool check_nojournal_mark(bool) const override {
 		return true;
 	}
+	virtual bool extendable() const override {
+		return true;
+	}
 	virtual bool implicitly_convertible_to(const TypeInfo* o) const override {
 		return o->implicitly_convertible_from(this);
 	}
@@ -611,9 +614,9 @@ std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, 
 					errors.emplace_back(*(ast->superclass), "Cannot extend struct-like classes.");
 				} else if(!type->check_nojournal_mark(ast->nojournal)) {
 					if(ast->nojournal) {
-						errors.emplace_back(*(ast->superclass), "Extending journalable class with nojournal one.");
+						errors.emplace_back(*(ast->superclass), "Extending journalable class with a nojournal one.");
 					} else {
-						errors.emplace_back(*(ast->superclass), "Extending nojournal class with journalable one.");
+						errors.emplace_back(*(ast->superclass), "Extending nojournal class with a journalable one.");
 					}
 				} else {
 					superclass = type;

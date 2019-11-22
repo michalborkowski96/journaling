@@ -31,16 +31,6 @@ public:
 	virtual void fun_bring_back() {
 		(basefun_bring_back());
 	}
-	void basefun_t_(🍆::StrongObject<Type_JournalTag_<T>> var_ttt, 🍆::StrongObject<T> var_tt) {
-		((var_ttt)->fun_t((var_tt)));
-	}
-
-	virtual void privfun_t_(🍆::StrongObject<Type_JournalTag_<T>> var_ttt, 🍆::StrongObject<T> var_tt) {
-		(basefun_t_(var_ttt, var_tt));
-	}
-	virtual void fun_t_(🍆::StrongObject<Type_JournalTag_<T>> var_ttt, 🍆::StrongObject<T> var_tt) {
-		(basefun_t_(var_ttt, var_tt));
-	}
 };
 
 template<>
@@ -68,14 +58,6 @@ public:
 	}
 	virtual void fun_bring_back() {
 		(basefun_bring_back());
-	}
-	void basefun_t_(🍆::StrongObject<Type_JournalTag_<🍆::Integer>>, 🍆::StrongObject<🍆::Integer>) {}
-
-	virtual void privfun_t_(🍆::StrongObject<Type_JournalTag_<🍆::Integer>> var_ttt, 🍆::StrongObject<🍆::Integer> var_tt) {
-		(basefun_t_(var_ttt, var_tt));
-	}
-	virtual void fun_t_(🍆::StrongObject<Type_JournalTag_<🍆::Integer>> var_ttt, 🍆::StrongObject<🍆::Integer> var_tt) {
-		(basefun_t_(var_ttt, var_tt));
 	}
 };
 
