@@ -466,11 +466,14 @@ void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
 		}
 
 		output.print_line(u8"#ifdef 🍆_Default_", ast_data.name);
+		output.print_line(u8"#ifndef 🍆_DefaultDone_", ast_data.name);
+		output.print_line(u8"#define 🍆_DefaultDone_", ast_data.name);
 		if(defined_templates.find(ast_data.name.name) == defined_templates.end()) {
 			output.print_line(u8"🍆_Default_", ast_data.name);
 		} else {
 			defined_templates.insert(ast_data.name.name);
 		}
+		output.print_line(u8"#endif");
 		output.print_line(u8"#else");
 
 		if(!c.parameters.empty()) {

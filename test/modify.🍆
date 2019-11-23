@@ -1,0 +1,92 @@
+import "../stdlib/vector.🍆"
+import "../stdlib/journal_tag.🍆"
+
+A {
+	int v;
+	constructor(int i){
+		v = i;
+	};
+	fun int get() {
+		return v;
+	} noeffect;
+	fun void set(int n) {
+		v = n;
+	} noeffect;
+}
+
+struct B {
+	int v;
+	constructor(int i){
+		v = i;
+	};
+	fun void print(OutputStream o) {
+		o.print_int(v);
+	};
+}
+
+nojournal AMod : Modifier<A> {
+	int diff;
+	constructor(int d)(){
+		diff = d;
+	};
+	fun void do(A arg) {
+		arg.set(arg.get() + diff);
+	};
+	fun void undo(A arg) {
+		arg.set(arg.get() - diff);
+	};
+}
+
+nojournal BMod : Modifier<B> {
+	int diff;
+	constructor(int d)(){
+		diff = d;
+	};
+	fun void do(B arg) {
+		arg.v = arg.v + diff;
+	};
+	fun void undo(B arg) {
+		arg.v = arg.v - diff;
+	};
+}
+
+struct Main {
+	strong OutputStream out;
+	constructor(){
+		out = new StdOut();
+	};
+	fun void main(){
+		{
+			var A a = new A(1);
+			auto t = new JournalTag<A>(a);
+			auto tt = new JournalTag<A>(a);
+			tt.modify(new AMod(3));
+			out.print_int_ln(a.get());
+			t.bring_back();
+			out.print_int_ln(a.get());
+			tt.bring_back();
+			out.print_int_ln(a.get());
+		}
+		out.print_newline();
+		{
+			var Vector<B> b = new Vector<B>();
+			b.push_back(new B(1));
+			b.push_back(new B(2));
+			b.push_back(new B(-1));
+			auto t = new JournalTag<Vector<B>>(b);
+			auto bm = new BMod(5);
+			for(auto i = b.begin(); i.neq(b.end()); i = i.next()) {
+				b.modify(i, bm);
+			}
+			auto tt = new JournalTag<Vector<B>>(b);
+			b.print(out);
+			out.print_newline();
+			t.bring_back();
+			b.print(out);
+			out.print_newline();
+			tt.bring_back();
+			b.print(out);
+			out.print_newline();
+		}
+	};
+}

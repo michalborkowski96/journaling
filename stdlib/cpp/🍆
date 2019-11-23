@@ -586,13 +586,13 @@ namespace 🍆 {
 			std::apply([&tags](auto&... a){goto_tags_do<0>(tags, a...);}, args);
 		}
 
-		void add_new_vertex(std::function<void()> there, std::function<void()> back) {
-			tag = tag.grow(std::move(there), std::move(back));
-		}
-
 		template<typename F>
 		static std::function<std::invoke_result_t<F>()> wrap_lambda(F&& lambda) {
 			return [f{std::make_shared<std::remove_cv_t<F>>(std::forward<F>(lambda))}](){return (*f)();};
+		}
+
+		void add_new_vertex(std::function<void()> there, std::function<void()> back) {
+			tag = tag.grow(std::move(there), std::move(back));
 		}
 	public:
 		Journal() : tag(Tag::make_new()) {}
@@ -602,6 +602,11 @@ namespace 🍆 {
 			R val = std::get<0>(((*obj).*basefun)(args...));
 			force_tag(tag);
 			return val;
+		}
+
+		void add_commit_new_vertex(std::function<void()> there, std::function<void()> back) {
+			there();
+			tag = tag.grow(std::move(there), std::move(back));
 		}
 
 		template<typename O, typename... Args>

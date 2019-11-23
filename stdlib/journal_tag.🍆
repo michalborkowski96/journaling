@@ -1,6 +1,11 @@
-JournalTag_ T : T {}
+abstract nojournal Modifier T {
+	fun void do(T t);
+	fun void undo(T t);
+	constructor(){};
+}
 
 nojournal JournalTag T {
-	constructor(T t){var JournalTag_<T> tt;/*only accept journalable types*/};
+	constructor(T t){};
 	fun void bring_back(){};
+	fun void modify(Modifier<T> m){};
 }

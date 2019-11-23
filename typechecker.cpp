@@ -779,7 +779,7 @@ std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, 
 				}
 				if(s) {
 					if(superclass_call_args.size() == ast.superclass_call->size() && !s->constructible_with(superclass_call_args)){
-						errors.emplace_back(ast.begin, ast.body->begin, "Superclass cannot be constructed with arguments (" + types_to_string(args) + ").");
+						errors.emplace_back(ast.begin, ast.body->begin, "Superclass cannot be constructed with arguments (" + types_to_string(superclass_call_args) + ").");
 					}
 				}
 			}

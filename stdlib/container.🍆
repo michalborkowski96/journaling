@@ -1,5 +1,6 @@
 import "comparator.🍆"
 import "iostream.🍆"
+import "journal_tag.🍆"
 
 abstract Container Element Iterator {
 	constructor(){};
@@ -12,6 +13,13 @@ abstract Container Element Iterator {
 	fun Iterator begin() noeffect;
 
 	fun Iterator end() noeffect;
+
+	fun void modify(Iterator i, Modifier<Element> m) {
+		m.do(i.deref());
+		return i, m;
+	} dual (Iterator i, Modifier<Element> m) {
+		m.undo(i.deref());
+	};
 
 	optional {
 
