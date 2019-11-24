@@ -88,5 +88,23 @@ struct Main {
 			b.print(out);
 			out.print_newline();
 		}
+		out.print_newline();
+		{
+			var Vector<B> b = new Vector<B>();
+			b.push_back(new B(1));
+			b.push_back(new B(2));
+			b.push_back(new B(-1));
+			auto t = new JournalTag<Vector<B>>(b);
+			b.modify_all(new BMod(5));
+			auto tt = new JournalTag<Vector<B>>(b);
+			b.print(out);
+			out.print_newline();
+			t.bring_back();
+			b.print(out);
+			out.print_newline();
+			tt.bring_back();
+			b.print(out);
+			out.print_newline();
+		}
 	};
 }

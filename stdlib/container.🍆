@@ -21,6 +21,17 @@ abstract Container Element Iterator {
 		m.undo(i.deref());
 	};
 
+	fun void modify_all(Modifier<Element> m) {
+		for(var Iterator i = begin(); i.neq(end()); i = i.next()) {
+			m.do(i.deref());
+		}
+		return m;
+	} dual (Modifier<Element> m) {
+		for(var Iterator i = begin(); i.neq(end()); i = i.next()) {
+			m.undo(i.deref());
+		}
+	};
+
 	optional {
 
 	fun int eq(Container other) {
