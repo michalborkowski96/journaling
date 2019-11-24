@@ -632,6 +632,13 @@ std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, 
 			});
 		}
 
+		if(ast->name.name == "JournalTag" && parameters.size() == 1) {
+			const RealClassInfo* rci = dynamic_cast<const RealClassInfo*>(parameters.front());
+			if(rci && rci->ast_data->nojournal) {
+				errors.emplace_back(ast->parameters.front(), "JournalTag can be instantiated only with journalable types and 'int'.");
+			}
+		}
+
 		if(!errors.empty()) {
 			return errors;
 		}
