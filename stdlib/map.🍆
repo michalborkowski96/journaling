@@ -1,74 +1,191 @@
-/*import "container.🍆"
-import "avl_.🍆"
-import "integer.🍆"
-import "pair.🍆"
 import "set.🍆"
 
-nojournal MapComparator_ K V : Comparator<Pair<K, V>> {
+nojournal UntaggedMapComparator_ K V : Comparator<Pair<K, V>> {
 	strong Comparator<K> c;
 	constructor (Comparator<K> comp)(){
 		c = comp;
 	};
 	fun int less(Pair<K, V> e1, Pair<K, V> e2) {
-		return c.less(e1.first, e2.first);
+		return c.less(e1.get_first(), e2.get_first());
 	};
 }
 
-Map K V : Container<Pair<K, V>, AVLNode_<Pair<K, V>>> {
-	strong Set<Pair<K, V>> data;
+UntaggedMap K V : Container<Pair<K, V>, AVLNode_<Pair<K, V>>> {
+	strong UntaggedSet<Pair<K, V>> set_;
 	constructor(Comparator<K> c) () {
-		data = new Set<Pair<K, V>>(new MapComparator_<K, V>(c));
+		set_ = new UntaggedSet<Pair<K, V>>(new UntaggedMapComparator_<K, V>(c));
 	};
 	fun V at(K key) {
 		auto iter = find(key);
-		return iter.deref().second;
+		return iter.deref().get_second();
 	} noeffect;
 	fun int size() {
-		return data.size();
+		return set_.size();
 	} noeffect;
 	fun AVLNode_<Pair<K, V>> begin() {
-		return data.begin();
+		return set_.begin();
 	} noeffect;
 	fun AVLNode_<Pair<K, V>> end() {
-		return data.end();
+		return set_.end();
 	} noeffect;
 	fun AVLNode_<Pair<K, V>> find(K key) {
-		return data.find(new Pair<K, V>(key, null));
+		return set_.find(new Pair<K, V>(key, null));
 	} noeffect;
 
-	fun Pair<Integer, Pair<K, V>> insert_kv(K key, V value) {
-		return this.insert(new Pair<K, V>(key, value));
-	} dual (){};
+	fun Pair<Integer, V> insert(K key, V value) {
+		return this.insert_(key, value, new AVLNode_<Pair<K, V>>(null, null));
+	} auto;
 
-	fun Pair<Integer, Pair<K, V>> insert(Pair<K, V> entry) {
-		var Pair<Integer, Pair<K, V>> old = data.insert(entry);
-		if(old.first.to_int()) {
-			return old, old.second, true;
+	fun Pair<Integer, V> insert_(K key, V value, AVLNode_<Pair<K, V>> use_node) {
+		auto r = set_.insert_(new Pair<K, V>(key, value), use_node);
+		auto rr = r.get_second();
+		if(rr == null) {
+			return new Pair<Integer, V>(new Integer(0), null), key, null, 0;
 		} else {
-			return old, new Pair<K, V>(entry.first, null), false;
+			return new Pair<Integer, V>(new Integer(1), rr.get_second()), rr.get_first(), rr.get_second(), 1;
 		}
-	} dual (Pair<K, V> old, int had_old) {
+	} dual (K key, V value, int had_old) {
 		if(had_old) {
-			insert(old);
+			set_.insert_(new Pair<K, V>(key, value), null);
 		} else {
-			erase(old.first);
+			set_.erase_iter(set_.find(new Pair<K, V>(key, null)));
 		}
 	};
 
 	fun Pair<Integer, V> erase(K key) {
-		var Pair<Integer, Pair<K, V>> old = data.erase(new Pair<K, V>(key, null));
-		var V v;
-		if(old.second != null) {
-			v = old.second.second;
+		return this.erase_iter(find(key));
+	} auto;
+
+	fun Pair<Integer, V> erase_iter(AVLNode_<Pair<K, V>> node) {
+		if(node.eq(set_.end())) {
+			return new Pair<Integer, V>(new Integer(0), null), null, null, null;
 		}
-		if(old.first.to_int()) {
-			return new Pair<Integer, V>(old.first, v), old.second, true;
+		auto r = set_.erase_iter(node);
+		auto rr = r.get_second();
+		if(rr == null) {
+			return new Pair<Integer, V>(r.get_first(), null), null, null, null;
 		} else {
-			return new Pair<Integer, V>(old.first, v), null, false;
+			return new Pair<Integer, V>(r.get_first(), rr.get_second()), rr.get_first(), rr.get_second(), node;
 		}
-	} dual (Pair<K, V> old, int had_old) {
-		if(had_old) {
-			insert(old);
+	} dual (K old_key, V old_value, AVLNode_<Pair<K, V>> use_node) {
+		if(use_node != null) {
+			insert_(old_key, old_value, use_node);
 		}
 	};
-}*/
+}
+
+nojournal TaggedMapComparator_ K V : Comparator<Pair<Pair<K, V>, SetBox_<JournalTag<K>>>> {
+	strong Comparator<K> c;
+	constructor (Comparator<K> comp)(){
+		c = comp;
+	};
+	fun int less(Pair<Pair<K, V>, SetBox_<JournalTag<K>>> e1, Pair<Pair<K, V>, SetBox_<JournalTag<K>>> e2) {
+		auto t1 = new JournalTag<K>(e1.get_first().get_first());
+		auto t2 = new JournalTag<K>(e2.get_first().get_first());
+		e1.get_second().data.bring_back();
+		e2.get_second().data.bring_back();
+		var int result = c.less(e1.get_first().get_first(), e2.get_first().get_first());
+		t1.bring_back();
+		t2.bring_back();
+		return result;
+	};
+}
+
+struct MapIterator_ K V {
+	weak AVLNode_<Pair<Pair<K, V>, SetBox_<JournalTag<K>>>> node_;
+	constructor(AVLNode_<Pair<Pair<K, V>, SetBox_<JournalTag<K>>>> node) {
+		node_ = node;
+	};
+	fun Pair<K, V> deref(){
+		return node_.deref().get_first();
+	};
+
+	fun void set(Pair<K, V> element){
+		node_.deref().get_second().data = new JournalTag<K>(element.get_first());
+		node_.deref().set_first(element);
+	};
+
+	fun MapIterator_ next() {
+		return new MapIterator_(node_.next());
+	};
+
+	fun MapIterator_ prev() {
+		return new MapIterator_(node_.prev());
+	};
+
+	fun int eq(MapIterator_ that) {
+		return node_.eq(that.node_);
+	};
+
+	fun int neq(MapIterator_ that) {
+		return node_.neq(that.node_);
+	};
+	fun JournalTag<K> tag(){
+		return node_.deref().get_second().data;
+	};
+}
+
+Map K V : Container<Pair<K, V>, MapIterator_<K, V>> {
+	strong UntaggedSet<Pair<Pair<K, V>, SetBox_<JournalTag<K>>>> set_;
+	constructor(Comparator<K> c) () {
+		set_ = new UntaggedSet<Pair<Pair<K, V>, SetBox_<JournalTag<K>>>>(new TaggedMapComparator_<K, V>(c));
+	};
+	fun V at(K key) {
+		auto iter = find(key);
+		return iter.deref().get_second();
+	} noeffect;
+	fun int size() {
+		return set_.size();
+	} noeffect;
+	fun MapIterator_<K, V> begin() {
+		return new MapIterator_<K, V>(set_.begin());
+	} noeffect;
+	fun MapIterator_<K, V> end() {
+		return new MapIterator_<K, V>(set_.end());
+	} noeffect;
+	fun MapIterator_<K, V> find(K key) {
+		return new MapIterator_<K, V>(set_.find(new Pair<Pair<K, V>, SetBox_<JournalTag<K>>>(new Pair<K, V>(key, null), new SetBox_<JournalTag<K>>(new JournalTag<K>(key)))));
+	} noeffect;
+
+	fun Pair<Integer, V> insert(K key, V value) {
+		return this.insert_(key, value, new AVLNode_<Pair<Pair<K, V>, SetBox_<JournalTag<K>>>>(null, null));
+	} auto;
+
+	fun Pair<Integer, V> insert_(K key, V value, AVLNode_<Pair<Pair<K, V>, SetBox_<JournalTag<K>>>> use_node) {
+		auto r = set_.insert_(new Pair<Pair<K, V>, SetBox_<JournalTag<K>>>(new Pair<K, V>(key, value), new SetBox_<JournalTag<K>>(new JournalTag<K>(key))), use_node);
+		auto rr = r.get_second();
+		if(rr == null) {
+			return new Pair<Integer, V>(new Integer(0), null), key, null, 0;
+		} else {
+			return new Pair<Integer, V>(new Integer(1), rr.get_first().get_second()), rr.get_first().get_first(), rr.get_first().get_second(), 1;
+		}
+	} dual (K key, V value, int had_old) {
+		if(had_old) {
+			set_.insert_(new Pair<Pair<K, V>, SetBox_<JournalTag<K>>>(new Pair<K, V>(key, value), new SetBox_<JournalTag<K>>(new JournalTag<K>(key))), null);
+		} else {
+			set_.erase_iter(set_.find(new Pair<Pair<K, V>, SetBox_<JournalTag<K>>>(new Pair<K, V>(key, null), new SetBox_<JournalTag<K>>(new JournalTag<K>(key)))));
+		}
+	};
+
+	fun Pair<Integer, V> erase(K key) {
+		return this.erase_iter(find(key));
+	} auto;
+
+	fun Pair<Integer, V> erase_iter(MapIterator_<K, V> node) {
+		auto n = node.node_;
+		if(n.eq(set_.end())) {
+			return new Pair<Integer, V>(new Integer(0), null), null, null, null;
+		}
+		auto r = set_.erase_iter(n);
+		auto rr = r.get_second();
+		if(rr == null) {
+			return new Pair<Integer, V>(r.get_first(), null), null, null, null;
+		} else {
+			return new Pair<Integer, V>(r.get_first(), rr.get_first().get_second()), rr.get_first().get_first(), rr.get_first().get_second(), n;
+		}
+	} dual (K old_key, V old_value, AVLNode_<Pair<Pair<K, V>, SetBox_<JournalTag<K>>>> use_node) {
+		if(use_node != null) {
+			insert_(old_key, old_value, use_node);
+		}
+	};
+}

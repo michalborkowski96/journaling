@@ -1,0 +1,110 @@
+import "../stdlib/better_string.🍆"
+import "../stdlib/map.🍆"
+import "../stdlib/vector.🍆"
+import "../stdlib/journal_tag.🍆"
+
+struct Main {
+	strong OutputStream out;
+	constructor(){
+		out = new StdOut();
+	};
+	fun void main(){
+		{
+			auto ints = new UntaggedMap<Integer, BetterString>(new DefaultComparator<Integer>());
+			ints.insert(new Integer(0), new BetterString("00"));
+			ints.insert(new Integer(3), new BetterString("03"));
+			ints.insert(new Integer(4), new BetterString("04"));
+			ints.insert(new Integer(1), new BetterString("01"));
+			ints.insert(new Integer(2), new BetterString("02"));
+			ints.erase(new Integer(4));
+			ints.print(out);
+			out.print_newline();
+			ints.find(new Integer(2)).deref().get_second().print(out);
+			out.print_newline();
+			auto t = new JournalTag<UntaggedMap<Integer, BetterString>>(ints);
+			ints.erase(new Integer(2));
+			ints.insert(new Integer(9), new BetterString("09"));
+			ints.print(out);
+			out.print_newline();
+			ints.find(new Integer(9)).deref().get_second().print(out);
+			out.print_newline();
+			t.bring_back();
+			ints.print(out);
+			out.print_newline();
+			ints.find(new Integer(2)).deref().get_second().print(out);
+			out.print_newline();
+		}
+
+		out.print_newline();
+
+		{
+			auto ints = new Map<Integer, BetterString>(new DefaultComparator<Integer>());
+			ints.insert(new Integer(0), new BetterString("00"));
+			ints.insert(new Integer(3), new BetterString("03"));
+			ints.insert(new Integer(4), new BetterString("04"));
+			ints.insert(new Integer(1), new BetterString("01"));
+			ints.insert(new Integer(2), new BetterString("02"));
+			ints.erase(new Integer(4));
+			ints.print(out);
+			out.print_newline();
+			ints.find(new Integer(2)).deref().get_second().print(out);
+			out.print_newline();
+			auto t = new JournalTag<Map<Integer, BetterString>>(ints);
+			ints.erase(new Integer(2));
+			ints.insert(new Integer(9), new BetterString("09"));
+			ints.print(out);
+			out.print_newline();
+			ints.find(new Integer(9)).deref().get_second().print(out);
+			out.print_newline();
+			t.bring_back();
+			ints.print(out);
+			out.print_newline();
+			ints.find(new Integer(2)).deref().get_second().print(out);
+			out.print_newline();
+		}
+
+		out.print_newline();
+
+		{
+			auto strings = new Map<BetterString, BetterString>(new DefaultComparator<BetterString>());
+			auto t = new JournalTag<Map<BetterString, BetterString>>(strings);
+			var BetterString bs1 = new BetterString("bb");
+			strings.insert(bs1, new BetterString("bs1"));
+			strings.insert(new BetterString("cc"), new BetterString("cc"));
+			strings.insert(new BetterString("dd"), new BetterString("dd"));
+			strings.print(out);
+			out.print_newline();
+			bs1.set(0, 'e');
+			bs1.set(1, 'e');
+			strings.print(out);
+			out.print_newline();
+			strings.insert(new BetterString("aa"), new BetterString("aa"));
+			strings.print(out);
+			out.print_newline();
+			strings.insert(new BetterString("ee"), new BetterString("ee"));
+			strings.print(out);
+			out.print_newline();
+			bs1 = new BetterString("bb");
+			strings.insert(bs1, new BetterString("new bs1"));
+			strings.print(out);
+			out.print_newline();
+			bs1.set(0, 'e');
+			bs1.set(1, 'e');
+			strings.print(out);
+			out.print_newline();
+			strings.erase(new BetterString("bb"));
+			strings.print(out);
+			out.print_newline();
+			strings.erase(new BetterString("ee"));
+			strings.print(out);
+			out.print_newline();
+			auto tt = new JournalTag<Map<BetterString, BetterString>>(strings);
+			t.bring_back();
+			strings.print(out);
+			out.print_newline();
+			tt.bring_back();
+			strings.print(out);
+			out.print_newline();
+		}
+	};
+}

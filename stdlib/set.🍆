@@ -51,54 +51,6 @@ UntaggedSet T : Container<T, AVLNode_<T>> {
 		return end_;
 	} noeffect;
 
-	/*
-	fun void print_structural_(AVLNode_<T> node, OutputStream out){
-		if(node == null) {
-			out.print_string("");
-		out.flush();
-			return;
-		}
-		if(node.deref() != null) {
-			node.deref().print(out);
-		out.flush();
-		} else {
-			out.print_string("null");
-		out.flush();
-		}
-		out.print_string(": H ");
-		out.flush();
-		out.print_int(node.height);
-		out.flush();
-		out.print_string(": P ");
-		out.flush();
-		if(node.parent != null) {
-			if(node.parent.deref() != null) {
-				node.parent.deref().print(out);
-		out.flush();
-			} else {
-				out.print_string("null");
-		out.flush();
-			}
-		}
-		out.print_string(" {");
-		out.flush();
-		print_structural_(node.left_son, out);
-		out.print_string(", ");
-		out.flush();
-		print_structural_(node.right_son, out);
-		out.print_string("}");
-		out.flush();
-	} noeffect;
-
-	fun void print_structural(OutputStream out){
-		out.print_int(size_);
-		out.print_string(" ");
-		print_structural_(root_, out);
-	} noeffect;
-
-	That's just for debug.
-	*/
-
 	fun AVLNode_<T> rebalance_(AVLNode_<T> z) {
 		var int bal = z.recalc_height();
 		if(bal == -2) {
@@ -395,13 +347,12 @@ Set T : Container<T, SetIterator_<T>> {
 		if(n.eq(set_.end())) {
 			return new Pair<Integer, T>(new Integer(0), null), null, null;
 		}
-		auto v = node.node_.deref();
 		auto r = set_.erase_iter(n);
 		auto rr = r.get_second();
 		if(rr == null) {
 			return new Pair<Integer, T>(r.get_first(), null), null, null;
 		} else {
-			return new Pair<Integer, T>(r.get_first(), rr.get_second()), v, n;
+			return new Pair<Integer, T>(r.get_first(), rr.get_second()), rr.get_second(), n;
 		}
 	} dual (Pair<SetBox_<JournalTag<T>>, T> old, AVLNode_<Pair<SetBox_<JournalTag<T>>, T>> use_node) {
 		if(use_node != null) {
