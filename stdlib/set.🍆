@@ -352,7 +352,7 @@ Set T : Container<T, SetIterator_<T>> {
 		if(rr == null) {
 			return new Pair<Integer, T>(r.get_first(), null), null, null;
 		} else {
-			return new Pair<Integer, T>(r.get_first(), rr.get_second()), rr.get_second(), n;
+			return new Pair<Integer, T>(r.get_first(), rr.get_second()), rr, n;
 		}
 	} dual (Pair<SetBox_<JournalTag<T>>, T> old, AVLNode_<Pair<SetBox_<JournalTag<T>>, T>> use_node) {
 		if(use_node != null) {
