@@ -2,27 +2,28 @@
 #define GROUP_POINTER_H
 
 #include <algorithm>
+#include <climits>
 #include <cstddef>
 
 namespace {
 	template<typename T>
 	class ControlBlock {
-		static_assert(sizeof(T*) == 8, "Due to magic, this works only on 64-bit architectures.");
 		union {
 			struct {
-				char garbage[sizeof(void*) - 1];
-				char points_to_a_control_block;
+				unsigned points_to_a_control_block : 1;
+				size_t : (CHAR_BIT * sizeof(void*) - 1);
 			} raw;
 			ControlBlock* next_control_block_pointer;
 			T* object_pointer;
 		} pointer;
-		static_assert(sizeof(pointer) == 8, "Woah padding!");
+		static_assert(std::alignment_of<ControlBlock*>::value > 1, "Due to magic, it is required that ControlBlock has memory alignment higher than 1.");
+		static_assert(sizeof(pointer) == sizeof(void*) && sizeof(pointer.raw) == sizeof(void*), "Woah padding!");
 		ControlBlock* previous_control_block_pointer;
 		size_t shared_count;
 		size_t weak_count;
 		~ControlBlock() = default;
 		ControlBlock* get_next_control_block() const {
-			static const size_t mask = [](){size_t i = 0; --i; char* ic = (char*) &i; ic[7] = 0; return i;}();
+			static const size_t mask = [](){size_t i = 0; i -= 2U; return i;}();
 			ControlBlock* p = pointer.next_control_block_pointer;
 			return reinterpret_cast<ControlBlock*>(reinterpret_cast<size_t>(p) & mask);
 		}
