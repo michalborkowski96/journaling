@@ -25,16 +25,5 @@ int main(){
 	for(long long i : nums) {
 		s += i;
 	}
-	long long ss = 0;
-	long long i = 0;
-	for(auto it = sums.begin(); it != sums.end(); ++it) {
-		if(i % 2) {
-			ss -= (*it)();
-		} else {
-			ss += (*it)();
-		}
-		++i;
-	}
 	std::cout << s << '\n';
-	std::cout << ss << '\n';
 }

@@ -21,9 +21,6 @@ int main(){
 			return s;
 		});
 	}
-	for(long long& i : nums) {
-		i += total2;
-	}
 	long long s = 0;
 	for(long long i : nums) {
 		s += i;
