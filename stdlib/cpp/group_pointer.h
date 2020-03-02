@@ -5,8 +5,11 @@
 #include <climits>
 #include <cstddef>
 
-namespace {
-	template<typename T>
+template<typename T>
+class GroupWeakPointer;
+
+template<typename T>
+class GroupSharedPointer {
 	class ControlBlock {
 		union {
 			struct {
@@ -112,16 +115,10 @@ namespace {
 			last->pointer.raw.points_to_a_control_block = true;
 		}
 	};
-}
 
-template<typename T>
-class GroupWeakPointer;
-
-template<typename T>
-class GroupSharedPointer {
-	ControlBlock<T>* control_block;
+	ControlBlock* control_block;
 	friend class GroupWeakPointer<T>;
-	GroupSharedPointer(ControlBlock<T>* control_block) : control_block(control_block) {
+	GroupSharedPointer(ControlBlock* control_block) : control_block(control_block) {
 		if(control_block) {
 			if(control_block->valid()) {
 				control_block->increase_shared_count();
@@ -139,7 +136,7 @@ public:
 		}
 	}
 	GroupSharedPointer(std::nullptr_t) : control_block(nullptr) {}
-	explicit GroupSharedPointer(T* ptr) try : control_block(new ControlBlock<T>(ptr)) {} catch(...) {delete ptr; throw;}
+	explicit GroupSharedPointer(T* ptr) try : control_block(new ControlBlock(ptr)) {} catch(...) {delete ptr; throw;}
 	GroupSharedPointer(const GroupSharedPointer& o) : control_block(o.control_block) {
 		if(control_block) {
 			control_block->increase_shared_count();
@@ -172,7 +169,7 @@ public:
 	}
 	T* get() {
 		T* ptr;
-		ControlBlock<T>* new_control_block;
+		ControlBlock* new_control_block;
 		control_block->get(new_control_block, ptr);
 		if(new_control_block != control_block) {
 			new_control_block->increase_shared_count();
@@ -197,7 +194,7 @@ public:
 
 template<typename T>
 class GroupWeakPointer {
-	ControlBlock<T>* control_block;
+	typename GroupSharedPointer<T>::ControlBlock* control_block;
 public:
 	using element_type = T;
 	GroupWeakPointer() = delete;
