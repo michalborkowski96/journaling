@@ -1,0 +1,36 @@
+import "../../stdlib/COMPLETE.🍆"
+
+struct Main {
+	strong OutputStream out;
+	strong InputStream in;
+	fun int sum_list(List<int> l) {
+		var int sum = 0;
+		for(auto it = l.begin(); !it.eq(l.end()); it = it.next()) {
+			sum = sum + it.deref();
+		}
+		return sum;
+	};
+	fun void test(){
+		auto ints = new List<int>();
+		var int limit = in.get_int();
+		for(var int i = 0; i < limit; i = i + 1) {
+			ints.push_back(i);
+		}
+		auto sum = sum_list[ints];
+		for(var int i = 0; i < limit; i = i + 1) {
+			ints.push_back(i);
+		}
+		out.print_int_ln(sum_list(ints));
+		out.print_int_ln(sum);
+	};
+
+
+	constructor(){
+		out = new StdOut();
+		in = new StdIn();
+	};
+
+	fun void main(){
+		test();
+	};
+}

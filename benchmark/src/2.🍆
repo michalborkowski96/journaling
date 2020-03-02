@@ -1,0 +1,67 @@
+import "../../stdlib/COMPLETE.🍆"
+
+BoxedInt {
+	int value;
+	constructor(int v) {
+		value = v;
+	};
+	fun int get_value() {
+		return value;
+	} noeffect;
+	fun void set_value(int new_value) {
+		var int v = value;
+		value = new_value;
+		return v;
+	} dual (int o) {
+		value = o;
+	};
+	fun int less(BoxedInt o) {
+		return value < o.get_value();
+	} noeffect;
+}
+
+nojournal Adder : Modifier<BoxedInt> {
+	int diff;
+	constructor(int d) () {
+		diff = d;
+	};
+	fun void do(BoxedInt i) {
+		i.set_value(i.get_value() + diff);
+	};
+	fun void undo(BoxedInt i) {
+		i.set_value(i.get_value() - diff);
+	};
+}
+
+struct Main {
+	strong OutputStream out;
+	strong InputStream in;
+	fun int sum_list(List<BoxedInt> l) {
+		var int sum = 0;
+		for(auto it = l.begin(); !it.eq(l.end()); it = it.next()) {
+			sum = sum + it.deref().get_value();
+		}
+		return sum;
+	};
+	fun void test(){
+		auto ints = new List<BoxedInt>();
+		var int limit = in.get_int();
+		for(var int i = 0; i < limit; i = i + 1) {
+			ints.push_back(new BoxedInt(i));
+		}
+		auto sum = sum_list[ints];
+		ints.modify_all(new Adder(limit));
+		out.print_int_ln(sum_list(ints));
+		out.print_int_ln(sum);
+	};
+
+
+	constructor(){
+		out = new StdOut();
+		in = new StdIn();
+	};
+
+	fun void main(){
+		test();
+	};
+}

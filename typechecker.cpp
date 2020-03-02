@@ -1317,6 +1317,9 @@ std::optional<std::vector<TypeError>> check_function_block(const TypeInfo* retur
 		[&](const std::unique_ptr<VariableAuto>& s) {
 			auto v = check_expr(s->value);
 			if(v) {
+				if(dynamic_cast<const VoidTypeInfo*>(v->type_info())) {
+					errors.emplace_back(s->value, "auto type must not resolve to void");
+				}
 				add_variable(s->name, v->type_info());
 			}
 			return false;
