@@ -1,5 +1,5 @@
 FLAGS=-std=c++17 -O0 -g -Wall -Wextra
-CC=clang++-8
+CC=clang++
 
 .PHONY: clean
 
