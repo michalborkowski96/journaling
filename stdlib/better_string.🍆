@@ -49,20 +49,19 @@ BetterString {
 	} dual (String old) {
 		str = old;
 	};
+	fun String str_() {
+		return str;
+	} noeffect;
 	fun int empty() {
 		return str.empty();
 	} noeffect;
-	fun void append(String s) {
+	fun void append(BetterString s) {
 		var int ssize = str.size();
-		str.append(s);
+		str.append(s.str_());
 		return ssize;
 	} dual (int ssize) {
 		str.resize(ssize, 0);
 	};
-	fun void substr(int pos, int len) {
-		str.resize(pos, len);
-	} noeffect;
-
 	fun BetterString add(BetterString s) {
 		return new BetterString(str + s.get_str_());
 	} noeffect;
