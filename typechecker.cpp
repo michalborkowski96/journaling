@@ -1618,10 +1618,10 @@ std::variant<const TypeInfo*, std::vector<TypeError>> ClassDatabase::get(const P
 	std::vector<const TypeInfo*> params;
 	for(const auto& p : t.parameters) {
 		call_with_error_log(errors, get(p), [&](const TypeInfo* pp){
-			const RealClassInfo* ppp = dynamic_cast<const RealClassInfo*>(pp);
+			/*const RealClassInfo* ppp = dynamic_cast<const RealClassInfo*>(pp);
 			if(ppp && current_class_parameters.find(ppp->pattern_name()) != current_class_parameters.end()) {
 				errors.emplace_back(p, "Cannot use class inside itself as another type parameter.");
-			} else {
+			} else */{
 				params.push_back(pp);
 			}
 		});

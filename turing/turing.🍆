@@ -1,0 +1,284 @@
+import "../stdlib/COMPLETE.🍆"
+
+struct Triplet A B C {
+	strong A first;
+	strong B second;
+	strong C third;
+	constructor(A f, B s, C t) {
+		first = f;
+		second = s;
+		third = t;
+	};
+}
+
+Turing {
+	strong Vector<int> tape;
+	strong UntaggedMap<BetterString, UntaggedMap<int, Triplet<int, BetterString, int>>> transitions; /* state -> character -> (jump, new_state, new_character) */
+	int position;
+	strong BetterString state;
+
+	constructor(BetterString default_state) {
+		tape = new Vector<int>();
+		transitions = new UntaggedMap<BetterString, UntaggedMap<int, Triplet<int, BetterString, int>>>(new DefaultComparator<BetterString>());
+		position = 0;
+		state = default_state;
+	};
+
+	fun int get_position() {
+		return position;
+	} noeffect;
+
+	fun BetterString get_state() {
+		return state;
+	} noeffect;
+
+	fun Vector<int> get_tape() {
+		return tape;
+	} noeffect;
+
+	fun void add_transition(BetterString s, int character, int jump, BetterString new_state, int new_character) {
+		var UntaggedMap<int, Triplet<int, BetterString, int>> m;
+		auto it = transitions.find(s);
+		if(it.eq(transitions.end())) {
+			m = new UntaggedMap<int, Triplet<int, BetterString, int>>(new DefaultComparator<int>());
+			transitions.insert(s, m);
+		} else {
+			m = it.deref().get_second();
+		}
+		return s, character, m.insert(character, new Triplet<int, BetterString, int>(jump, new_state, new_character));
+	} dual (BetterString s, int character, Pair<Integer, Triplet<int, BetterString, int>> od) {
+		if(od.get_first().to_int()) {
+			transitions.at(s).insert(character, od.get_second());
+		} else {
+			transitions.at(s).erase(character);
+			if(transitions.at(s).empty()) {
+				transitions.erase(s);
+			}
+		}
+	};
+
+	fun void remove_transition(BetterString s, int character) {
+		var UntaggedMap<int, Triplet<int, BetterString, int>> m;
+		auto it = transitions.find(s);
+		if(it.eq(transitions.end())) {
+			return null, null, null;
+		} else {
+			m = it.deref().get_second();
+		}
+		auto e = m.erase(character);
+		if(m.empty()) {
+			transitions.erase(s);
+		}
+		if(e.get_first().to_int()) {
+			return s, character, e.get_second();
+		} else {
+			return null, null, null;
+		}
+	} dual (BetterString s, int character, Triplet<int, BetterString, int> ov) {
+		if(s != null) {
+			add_transition(s, character, ov.first, ov.second, ov.third);
+		}
+	};
+
+	fun int at(int pos) {
+		if(pos < 0) {
+			auto error = new Error("Position less than 0.");
+		}
+		if(pos < tape.size()) {
+			return tape.at(pos);
+		} else {
+			return 0;
+		}
+	} noeffect;
+
+	fun int set_position(int pos) {
+		var int old_pos = position;
+		position = pos;
+		return old_pos, old_pos;
+	} dual(int pos) {
+		position = pos;
+	};
+
+	fun BetterString set_state(BetterString s) {
+		var BetterString old_state = state;
+		state = s;
+		return old_state, old_state;
+	} dual(BetterString s) {
+		state = s;
+	};
+
+	fun int set_character(int pos, int character) {
+		if(pos < 0) {
+			auto error = new Error("Position less than 0.");
+		}
+		if(pos < tape.size()) {
+			var int old = tape.at(pos);
+			tape.set(pos, character);
+			shrink_();
+			return old, pos, old;
+		} else if (character != 0) {
+			tape.resize(pos, 0);
+			tape.push_back(character);
+			return 0, pos, 0;
+		} else {
+			return 0, pos, 0;
+		}
+	} dual(int pos, int character) {
+		set_character(pos, character);
+	};
+
+	fun void shrink_() {
+		while(1) {
+			if(tape.empty()) {
+				break;
+			}
+			if(tape.at(tape.size() - 1) != 0) {
+				break;
+			}
+			tape.pop_back();
+		}
+	} noeffect;
+
+	fun int step() {
+		auto it1 = transitions.find(state);
+		if(it1.eq(transitions.end())) {
+			return 0, 0, null, null, null;
+		}
+		auto it2 = it1.deref().get_second().find(at(position));
+		if(it2.eq(it1.deref().get_second().end())) {
+			return 0, 0, null, null, null;
+		}
+		auto tr = it2.deref().get_second();
+		if(position + tr.first < 0) {
+			return 0, 0, null, null, null;
+		}
+		var int old_character = set_character(position, tr.third);
+		var BetterString old_state = state;
+		state = tr.second;
+		position = position + tr.first;
+		return 1, 1, tr.first, old_state, old_character;
+	} dual (int success, int jump, BetterString old_state, int old_character) {
+		if(success) {
+			position = position - jump;
+			state = old_state;
+			set_character(position, old_character);
+		}
+	};
+
+	fun void print_character_(OutputStream out, int char, int ascii_characters) {
+		if(ascii_characters && char <= 126 && char >= 33) {
+			auto str = new String();
+			str.resize(1, char);
+			out.print_string(str);
+		} else {
+			out.print_int(char);
+		}
+	} noeffect;
+
+	fun void print_transitions(OutputStream out, int ascii_characters) {
+		for(auto it = transitions.begin(); it.neq(transitions.end()); it = it.next()) {
+			out.print_string("State ");
+			it.deref().get_first().print(out);
+			out.print_string_ln(":");
+			for(auto it2 = it.deref().get_second().begin(); it2.neq(it.deref().get_second().end()); it2 = it2.next()) {
+				print_character_(out, it2.deref().get_first(), ascii_characters);
+				out.print_string(" -> ");
+				out.print_int(it2.deref().get_second().first);
+				out.print_string(", ");
+				it2.deref().get_second().second.print(out);
+				out.print_string(", ");
+				print_character_(out, it2.deref().get_second().third, ascii_characters);
+				out.print_newline();
+			}
+		}
+	} noeffect;
+}
+
+struct Main {
+	constructor(){};
+	fun void main(){
+		var StdIn in = new StdIn();
+		var StdOut out = new StdOut();
+
+		var Turing machine = new Turing(new BetterString("start"));
+		var UntaggedMap<String, JournalTag<Turing>> savestates = new UntaggedMap<String, JournalTag<Turing>>(new DefaultComparator<String>());
+
+		out.print_string("
+This is a tool for debugging Turing machines. States are strings, characters are ints. It starts at the beginning of a tape filled with zeros in state \"start\". Commands:
+add_tran {state} {character} {jump} {new_state} {new_character} - add transition. Jump can be any integer, allowing moving not only by 1.
+del_tran {state} {character} - delete transition
+show_tran {ascii} - show transitions. ascii parameter is a bool whether characters between 33 and 126 should be printed as ascii characters or numbers.
+set_char {position} {character} - set a character on the tape
+set_pos {position} - set the position
+show_pos - show the position
+set_state {state} - set the state
+show_state - show the state
+show_tape {ascii} - print the non-empty part of the tape
+step - make a step
+save {name} - make a savestate on string {name}
+load {name} - load a savestate on string {name}
+exit - exit
+");
+
+		while(1) {
+			var String command = in.get_string();
+			if(command.eq("add_tran")) {
+				auto state = new BetterString(in.get_string());
+				auto character = in.get_int();
+				auto jump = in.get_int();
+				auto new_state = new BetterString(in.get_string());
+				auto new_character = in.get_int();
+				machine.add_transition(state, character, jump, new_state, new_character);
+			} else if (command.eq("del_tran")) {
+				auto state = new BetterString(in.get_string());
+				auto character = in.get_int();
+				machine.remove_transition(state, character);
+			} else if (command.eq("show_tran")) {
+				auto ascii = in.get_int();
+				machine.print_transitions(out, ascii);
+			} else if (command.eq("set_char")) {
+				auto position = in.get_int();
+				auto character = in.get_int();
+				machine.set_character(position, character);
+			} else if (command.eq("set_pos")) {
+				auto position = in.get_int();
+				machine.set_position(position);
+			} else if (command.eq("show_pos")) {
+				out.print_int_ln(machine.get_position());
+			} else if (command.eq("set_state")) {
+				auto state = new BetterString(in.get_string());
+				machine.set_state(state);
+			} else if (command.eq("show_state")) {
+				machine.get_state().print(out);
+				out.print_newline();
+			} else if (command.eq("show_tape")) {
+				auto ascii = in.get_int();
+				auto tape = machine.get_tape();
+				for(var int i = 0; i < tape.size(); i = i + 1) {
+					machine.print_character_(out, tape.at(i), ascii);
+					out.print_string(" ");
+				}
+				out.print_newline();
+			} else if (command.eq("step")) {
+				if(!machine.step()) {
+					out.print_string_ln("Machine locked!");
+				}
+			} else if (command.eq("save")) {
+				auto name = in.get_string();
+				savestates.insert(name, new JournalTag<Turing>(machine));
+			} else if (command.eq("exit")) {
+				return;
+			} else if (command.eq("load")) {
+				auto name = in.get_string();
+				auto it = savestates.find(name);
+				if(it.eq(savestates.end())) {
+					out.print_string_ln("Savestate not found.");
+				} else {
+					it.deref().get_second().bring_back();
+				}
+			} else {
+				out.print_string_ln("Invalid command " + command);
+			}
+		}
+	};
+}
