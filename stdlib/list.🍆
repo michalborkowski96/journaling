@@ -50,6 +50,12 @@ List T : OrderedContainer<T, ListElement_<T>> {
 		erase(iter);
 	};
 
+	destructor {
+		while(!empty()) {
+			pop_back();
+		}
+	};
+
 	fun ListElement_<T> erase(ListElement_<T> iter) {
 		size_ = size_ - 1;
 		iter.next_.prev_ = iter.prev_;

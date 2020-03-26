@@ -192,15 +192,14 @@ namespace 🍆 {
 			return !(*this == b);
 		}
 
-		std::shared_ptr<void> get_value() {
+		std::shared_ptr<void>& get_value() {
 			return std::visit(overload(
-			[](std::shared_ptr<void> v){return v;},
-			[&](std::unique_ptr<std::function<StrongObjectImpl()>>& f){
+			[](std::shared_ptr<void>& v)->std::shared_ptr<void>&{return v;},
+			[&](std::unique_ptr<std::function<StrongObjectImpl()>>& f)->std::shared_ptr<void>&{
 				StrongObjectImpl val = (*f)();
-				std::shared_ptr<void> v = val.get_value();
-				*obj = v;
+				*obj = val.get_value();
 				val.obj.group_assume(obj);
-				return v;
+				return val.get_value();
 			}
 			), *obj);
 		}
@@ -245,10 +244,10 @@ namespace 🍆 {
 	public:
 		using element_type = T;
 		T& operator*() {
-			return *std::static_pointer_cast<T>(obj.get_value());
+			return *static_cast<T*>(obj.get_value().get());
 		}
 		T* operator->() {
-			return std::static_pointer_cast<T>(obj.get_value()).get();
+			return static_cast<T*>(obj.get_value().get());
 		}
 		StrongObject(const Null&) {}
 		StrongObject() = default;
@@ -319,10 +318,10 @@ namespace 🍆 {
 	public:
 		using element_type = T;
 		T& operator*() {
-			return *get_value();
+			return *static_cast<T*>(obj.get_value().get());
 		}
 		T* operator->() {
-			return get_value().get();
+			return static_cast<T*>(obj.get_value().get());
 		}
 		WeakObject(const Null&) {}
 		WeakObject(WeakObjectImpl obj) : obj(obj) {}

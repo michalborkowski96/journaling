@@ -75,7 +75,7 @@ class GroupSharedPointer {
 		void decrease_shared_count(){
 			if((--shared_count) == 0) {
 				try_free();
-				if(weak_count == 0) {
+				if(weak_count == 0 && shared_count == 0) {
 					remove();
 				}
 			}
@@ -91,9 +91,9 @@ class GroupSharedPointer {
 				return;
 			}
 			ControlBlock* cb = get_last_block();
-			cb->shared_count = 1;
+			++cb->shared_count;
 			delete cb->pointer.object_pointer;
-			cb->shared_count = 0;
+			--cb->shared_count;
 		}
 
 		void remove() {
