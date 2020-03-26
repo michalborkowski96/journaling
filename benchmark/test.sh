@@ -24,7 +24,13 @@ perform_test_c++ () {
 }
 
 get_user_time () {
-	echo "$1" | grep User\ time\ \(seconds\):\ .* | cut -c 23- --
+	e=$(echo "$1" | grep terminated\ by\ signal)
+	if [ -z "$e" ]
+	then
+		echo "$1" | grep User\ time\ \(seconds\):\ .* | cut -c 23- --
+	else
+		echo "$e"
+	fi
 }
 
 get_used_memory () {
