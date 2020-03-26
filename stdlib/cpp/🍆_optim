@@ -11,9 +11,6 @@
 #include <tuple>
 #include <cstring>
 
-#warning IOSTREAM
-#include <iostream>
-
 #ifndef O_NO_LAZY_INT
 #define O_NO_LAZY_INT 0
 #endif
