@@ -288,10 +288,16 @@ namespace ast {
 	};
 
 	struct Module {
-		std::vector<std::string> imports;
+		struct Import {
+			std::string path;
+			bool standard;
+			Import() = delete;
+			Import(std::string path, bool standard);
+		};
+		std::vector<Import> imports;
 		std::vector<Class> classes;
 		Module() = delete;
-		Module(std::vector<std::string>&& imports, std::vector<Class>&& classes);
+		Module(std::vector<Import>&& imports, std::vector<Class>&& classes);
 	};
 
 }

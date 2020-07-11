@@ -1,8 +1,8 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
-#include <string>
+#include <filesystem>
 
-int go_to_file_path(std::string absolute_path);
+std::filesystem::path get_executable_path();
 
 #endif

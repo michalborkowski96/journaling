@@ -1,0 +1,14 @@
+import !"vector.🍆"
+
+struct Main {
+	strong OutputStream out;
+	constructor(){
+		out = new StdOut();
+	};
+
+	fun void main(){
+		var Vector<int> ints = new Vector<int>();
+		ints.push_back(1);
+		out.print_int_ln(ints.at(0));
+	};
+}

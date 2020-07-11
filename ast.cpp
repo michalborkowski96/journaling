@@ -70,4 +70,6 @@ ClassVariablePointer::ClassVariablePointer(size_t begin, size_t end, Identifier&
 
 Class::Class(size_t begin, size_t end, Identifier&& name, std::vector<Function>&& functions, std::vector<std::vector<Function>>&& optional_functions, std::vector<ClassVariable>&& variables, std::vector<Identifier>&& parameters, std::optional<PointerType>&& superclass, std::vector<Constructor>&& constructors, std::optional<Destructor>&& destructor, bool public_variables, bool abstract, bool nojournal) : AstNode(begin, end), name(std::move(name)), functions(std::move(functions)), optional_functions(std::move(optional_functions)), variables(std::move(variables)), parameters(move(parameters)), superclass(move(superclass)), constructors(move(constructors)), destructor(move(destructor)), public_variables(public_variables), abstract(abstract), nojournal(nojournal) {}
 
-Module::Module(std::vector<std::string>&& imports, std::vector<Class>&& classes) : imports(std::move(imports)), classes(std::move(classes)) {}
+Module::Module(std::vector<Import>&& imports, std::vector<Class>&& classes) : imports(std::move(imports)), classes(std::move(classes)) {}
+
+Module::Import::Import(std::string path, bool standard) : path(std::move(path)), standard(standard) {}

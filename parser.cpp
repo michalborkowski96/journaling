@@ -1,7 +1,6 @@
 #include "parser.h"
 #include "system.h"
 
-#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <map>
@@ -681,11 +680,15 @@ namespace {
 
 		Module parse() {
 			pos = 0;
-			std::vector<std::string> imports;
+			std::vector<Module::Import> imports;
 			std::vector<Class> classes;
 			while(tokens[pos].type == LexemeType::IMPORT) {
 				++pos;
-				imports.push_back(parse_string());
+				bool standard = tokens[pos].type == LexemeType::NEGATION;
+				if(standard) {
+					++pos;
+				}
+				imports.emplace_back(parse_string(), standard);
 			}
 			while(tokens[pos].type != LexemeType::END_OF_FILE) {
 				classes.push_back(parse_class());
@@ -709,7 +712,7 @@ namespace {
 		{LexemeType::OR, 7}
 	};
 
-	std::string read_file(const std::string& path) {
+	std::string read_file(const std::filesystem::path& path) {
 		std::ifstream i;
 		i.exceptions (std::ifstream::failbit | std::ifstream::badbit);
 		i.open(path);
@@ -723,59 +726,48 @@ namespace {
 	}
 }
 
-ParserError::ParserError(std::vector<std::string> parsing_stack, std::optional<std::string> message, std::optional<std::tuple<size_t, size_t, std::string>> text) : parsing_stack(move(parsing_stack)), message(move(message)), text(move(text)) {}
+ParserError::ParserError(std::vector<std::filesystem::path> parsing_stack, std::optional<std::string> message, std::optional<std::tuple<size_t, size_t, std::string>> text) : parsing_stack(move(parsing_stack)), message(move(message)), text(move(text)) {}
 
 std::vector<ParsedModule> parse_program(std::string path) {
 	std::vector<ParsedModule> modules;
-	std::vector<std::string*> parsing_stack;
-	std::set<std::string> already_parsed;
+	std::vector<std::filesystem::path*> parsing_stack;
+	std::set<std::filesystem::path> already_parsed;
 
-	std::function<void(std::string&)> program_parser;
+	const std::filesystem::path stdlib_path = get_executable_path().parent_path() / "stdlib";
 
-	auto make_error = [&](std::string msg){
-		std::vector<std::string> err_parsing_stack;
+	std::function<void(std::filesystem::path)> program_parser;
+
+	auto make_error = [&](std::string msg, std::optional<std::tuple<size_t, size_t, std::string>> text = {}){
+		std::vector<std::filesystem::path> err_parsing_stack;
 		err_parsing_stack.reserve(parsing_stack.size());
-		for(const std::string* s : parsing_stack) {
+		for(const std::filesystem::path* s : parsing_stack) {
 			err_parsing_stack.push_back(*s);
 		}
-		return ParserError(move(err_parsing_stack), move(msg), {});
+		return ParserError(move(err_parsing_stack), move(msg), std::move(text));
 	};
 
-	auto make_error_with_text = [&](std::string msg, size_t begin, size_t end, std::string text){
-		std::vector<std::string> err_parsing_stack;
-		err_parsing_stack.reserve(parsing_stack.size());
-		for(const std::string* s : parsing_stack) {
-			err_parsing_stack.push_back(*s);
-		}
-		return ParserError(move(err_parsing_stack), move(msg), std::make_tuple(begin, end, move(text)));
-	};
-
-	program_parser = [&](std::string path) {
+	program_parser = [&](std::filesystem::path path) {
 		parsing_stack.push_back(&path);
 		try {
 			path = std::filesystem::canonical(path);
 		} catch (const std::filesystem::filesystem_error&) {
 			throw make_error("Cannot convert relative path to canonical path");
 		}
-		std::string ext(FILENAME_EXTENSION);
-		if(path.size() < ext.size() || path.substr(path.size() - ext.size()) != ext) {
-			throw make_error("Filenames must end with " + ext);
+		if(path.extension() != FILENAME_EXTENSION) {
+			throw make_error("Filenames must have extension " + std::string(FILENAME_EXTENSION));
 		}
 		if(already_parsed.find(path) != already_parsed.end()) {
 			parsing_stack.pop_back();
 			return;
 		}
 		parsing_stack.pop_back();
-		for(const std::string* s : parsing_stack) {
+		for(const std::filesystem::path* s : parsing_stack) {
 			if(*s == path) {
 				parsing_stack.push_back(&path);
 				throw make_error("Module dependency cycle");
 			}
 		}
 		parsing_stack.push_back(&path);
-		if(go_to_file_path(path) != 0) {
-			throw make_error("IO error");
-		}
 		std::string text;
 		try {
 			text = read_file(path);
@@ -787,13 +779,13 @@ std::vector<ParsedModule> parse_program(std::string path) {
 		try {
 			module_object = Parser::parse(text);
 		} catch (const Parser::Error& e) {
-			throw make_error_with_text("Syntax error", e.begin, e.end, move(text));
+			throw make_error("Syntax error", std::make_tuple(e.begin, e.end, move(text)));
 		} catch (const LexerError& e) {
-			throw make_error_with_text(std::move(e.msg), e.begin, e.end, move(text));
+			throw make_error(std::move(e.msg), std::make_tuple(e.begin, e.end, move(text)));
 		}
-		for(std::string& i : module_object->imports) {
-			program_parser(i);
-			go_to_file_path(path);
+		std::filesystem::path base_path = path.parent_path();
+		for(const Module::Import& i : module_object->imports) {
+			program_parser(i.standard ? stdlib_path / i.path : base_path / i.path);
 		}
 		modules.push_back(ParsedModule(path, move(text), std::move(*module_object)));
 		already_parsed.insert(path);

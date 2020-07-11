@@ -1,20 +1,22 @@
 #include "system.h"
 
+#include <stdexcept>
+
 #include <unistd.h>
 
-int go_to_file_path(std::string absolute_path) {
-	size_t i = absolute_path.size() - 1;
-	size_t end = 0;
-	--end;
-	while(i != end) {
-		if(absolute_path[i] == '/') {
-			absolute_path[i] = 0;
-			break;
+std::filesystem::path get_executable_path() {
+	std::string path(1, '\0');
+	while(true) {
+		ssize_t r = readlink("/proc/self/exe", path.data(), path.size());
+		if(r < 0) {
+			throw std::runtime_error("Failed to read the path.");
 		}
-		--i;
+		if((size_t) r == path.size()) {
+			path.resize(path.size() << 1);
+			continue;
+		} else {
+			path.resize(r);
+			return path;
+		}
 	}
-	if(i == end) {
-		return -1;
-	}
-	return chdir(absolute_path.data());
 }

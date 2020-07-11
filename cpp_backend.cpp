@@ -1,5 +1,4 @@
 #include "typechecker.h"
-#include "system.h"
 
 using namespace ast;
 using namespace expression;
