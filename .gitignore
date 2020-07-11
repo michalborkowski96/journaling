@@ -1,6 +1,4 @@
-/test/*
-!/test/*.🍆
-!/test/run.cpp
+/test/a.out
 /benchmark/bin/*
 /🍆
 /*.o

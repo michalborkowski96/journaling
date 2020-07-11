@@ -9,7 +9,7 @@ struct Main {
 	constructor(){
 		out = new StdOut();
 	};
-	fun void main(){
+	fun int main(){
 		{
 			auto ints = new Set<Integer>(new DefaultComparator<Integer>());
 			ints.insert(new Integer(1));
@@ -74,5 +74,6 @@ struct Main {
 			strings.print(out);
 			out.print_newline();
 		}
+		return 0;
 	};
 }

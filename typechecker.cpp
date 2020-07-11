@@ -62,7 +62,7 @@ void TypeError::add_context(std::shared_ptr<const std::string> ctx){
 	context.push_back(ctx);
 }
 
-void TypeError::print_errors(std::ostream& o, const std::vector<ParsedModule>& modules, const std::pair<std::vector<TypeError>, std::vector<TypeError>>& errors) {
+void TypeError::print_errors(std::ostream& o, const std::vector<ParsedModule>& modules, const std::vector<TypeError>& errors, const char* color) {
 	auto print_error = [&](const TypeError& e, const char* colour, const std::string& text) {
 		o << "In file:\n" << **e.filename << "\n";
 		o << position(text, e.begin, e.end) << "\n";
@@ -91,8 +91,7 @@ void TypeError::print_errors(std::ostream& o, const std::vector<ParsedModule>& m
 			print_error(e, colour, pm->text);
 		}
 	};
-	print_error_vec(errors.first, RED);
-	print_error_vec(errors.second, YELLOW);
+	print_error_vec(errors, color);
 }
 
 bool TypeInfo::implicitly_convertible_from(const VoidTypeInfo*) const {

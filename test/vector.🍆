@@ -14,7 +14,7 @@ struct Main {
 	constructor(){
 		out = new StdOut();
 	};
-	fun void main(){
+	fun int main(){
 		var Vector<Integer> ints = new Vector<Integer>();
 		ints.push_back(new Integer(4));
 		ints.push_back(new Integer(7));
@@ -38,5 +38,6 @@ struct Main {
 		eval(lazy_print(ints));
 		eval(u);
 		eval(lazy_print(ints));
+		return 0;
 	};
 }

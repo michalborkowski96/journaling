@@ -416,10 +416,10 @@ public:
 
 namespace typechecker {
 
-void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes) {
+void print(std::ostream& o, const std::vector<const RealClassInfo*>& classes, const std::filesystem::path& path_to_cpp_library) {
 	OutputFile output(o);
 
-	output.print_line(u8"#include <🍆>");
+	output.print_line(u8"#include ", path_to_cpp_library);
 	output.print_line();
 
 	{

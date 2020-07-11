@@ -57,4 +57,20 @@ constexpr const char* const GREEN = "\033[1;32m";
 
 constexpr const char* const ENDCOLOUR = "\033[m";
 
+template<size_t N = 0, typename F, typename... Ts>
+void for_each_tuple(F&& function, std::tuple<Ts...>& tuple) {
+	if constexpr (N < std::tuple_size<std::tuple<Ts...>>::value) {
+		function(std::get<N>(tuple));
+		for_each_tuple<N + 1>(std::forward<F>(function), tuple);
+	}
+}
+
+template<size_t N = 0, typename F, typename... Ts>
+void for_each_tuple(F&& function, const std::tuple<Ts...>& tuple) {
+	if constexpr (N < std::tuple_size<std::tuple<Ts...>>::value) {
+		function(std::get<N>(tuple));
+		for_each_tuple<N + 1>(std::forward<F>(function), tuple);
+	}
+}
+
 #endif

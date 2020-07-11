@@ -6,9 +6,10 @@ struct Main {
 		out = new StdOut();
 	};
 
-	fun void main(){
+	fun int main(){
 		var Vector<int> ints = new Vector<int>();
 		ints.push_back(1);
 		out.print_int_ln(ints.at(0));
+		return 0;
 	};
 }

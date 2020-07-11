@@ -1,0 +1,16 @@
+import !"array.🍆"
+import !"string.🍆"
+import !"iostream.🍆"
+
+struct Main {
+	strong OutputStream out;
+	constructor(){
+		out = new StdOut();
+	};
+	fun int main(Array<String> args){
+		for(var int i = 0; i < args.size(); i = i + 1) {
+			out.print_string_ln(args.at(i));
+		}
+		return 0;
+	};
+}

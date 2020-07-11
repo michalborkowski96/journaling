@@ -114,9 +114,10 @@ struct Main {
 		out = new StdOut();
 	};
 
-	fun void main(){
+	fun int main(){
 		test1();
 		out.print_newline();
 		test2();
+		return 0;
 	};
 }

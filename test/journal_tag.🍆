@@ -12,7 +12,7 @@ struct Main {
 		auto t = new JournalTag<int>(i);
 		t.bring_back();
 	};
-	fun void main(){
+	fun int main(){
 		var List<Integer> list = new List<Integer>();
 		list.push_back(new Integer(1));
 		list.print(out);
@@ -31,5 +31,6 @@ struct Main {
 		s2.bring_back();
 		list.print(out);
 		out.print_newline();
+		return 0;
 	};
 }

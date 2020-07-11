@@ -4,6 +4,5 @@ This code is a bit of a mess, mostly because it was supposed to be for research.
 2. `make`
 3. You should see a file called `🍆`. This is the compiler.
 4. `cd test`
-5. `../🍆 hello_world.🍆 > main.cpp` 
-6. `clang++ run.cpp -O0 -I../stdlib/cpp -std=c++17`
-7. `./a.out`
+5. `../🍆 hello_world.🍆 -noe -c | clang++ -std=c++17 -x c++ -O3 -`
+6. `./a.out`

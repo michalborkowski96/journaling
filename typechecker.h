@@ -1,15 +1,16 @@
 #ifndef TYPECHECKER_H
 #define TYPECHECKER_H
 
+#include "ast.h"
+#include "parser.h"
+#include "util.h"
+
 #include <vector>
 #include <optional>
 #include <functional>
 #include <map>
 #include <set>
-
-#include "ast.h"
-#include "parser.h"
-#include "util.h"
+#include <filesystem>
 
 namespace typechecker {
 
@@ -28,7 +29,7 @@ struct TypeError {
 	TypeError(const ast::VariableType&, std::string);
 	void fill_filename_if_empty(std::shared_ptr<const std::string> fname);
 	void add_context(std::shared_ptr<const std::string> ctx);
-	static void print_errors(std::ostream& o, const std::vector<ParsedModule>& modules, const std::pair<std::vector<TypeError>, std::vector<TypeError>>& errors);
+	static void print_errors(std::ostream& o, const std::vector<ParsedModule>& modules, const std::vector<TypeError>& errors, const char* color);
 	static void contract_errors(std::vector<TypeError>& errors);
 	bool operator==(const TypeError&) const;
 };
@@ -71,7 +72,7 @@ public:
 	virtual ~TypeInfo() = default;
 	bool explicitly_convertible_to(const TypeInfo* o) const;
 	bool comparable_with(const TypeInfo* o) const;
-	friend void print(std::ostream&, const std::vector<const RealClassInfo*>&);
+	friend void print(std::ostream&, const std::vector<const RealClassInfo*>&, const std::filesystem::path& path_to_cpp_library);
 	virtual bool requires_call_nojournal_marks() const;
 	virtual bool forbids_call_nojournal_marks() const;
 };

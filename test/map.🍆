@@ -8,7 +8,7 @@ struct Main {
 	constructor(){
 		out = new StdOut();
 	};
-	fun void main(){
+	fun int main(){
 		{
 			auto ints = new UntaggedMap<Integer, BetterString>(new DefaultComparator<Integer>());
 			ints.insert(new Integer(0), new BetterString("00"));
@@ -106,5 +106,6 @@ struct Main {
 			strings.print(out);
 			out.print_newline();
 		}
+		return 0;
 	};
 }

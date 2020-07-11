@@ -55,7 +55,7 @@ struct Main {
 	constructor(){
 		out = new StdOut();
 	};
-	fun void main(){
+	fun int main(){
 		{
 			var A a = new A(1);
 			auto t = new JournalTag<A>(a);
@@ -106,5 +106,6 @@ struct Main {
 			b.print(out);
 			out.print_newline();
 		}
+		return 0;
 	};
 }

@@ -33,11 +33,12 @@ struct Main {
 	constructor() {
 		out = new StdOut();
 	};
-	fun void main(){
+	fun int main(){
 		var FListInt i = new FListInt(9, null);
 		i.print(out);
 		(new StdIn()).get_string();
 		i = get_naturals_from(4);
 		i.print(out);
+		return 0;
 	};
 }

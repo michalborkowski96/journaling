@@ -2,9 +2,11 @@ import "../stdlib/iostream.🍆"
 
 struct Main {
 	constructor(){};
-	fun void main(){
+	fun int main(){
 		var StdIn in = new StdIn();
 		var StdOut out = new StdOut();
+		out.print_string_ln("What's your name?");
 		out.print_string_ln("Goodbye " + in.get_string());
+		return 0;
 	};
 }

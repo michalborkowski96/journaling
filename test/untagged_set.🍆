@@ -9,7 +9,7 @@ struct Main {
 	constructor(){
 		out = new StdOut();
 	};
-	fun void main(){
+	fun int main(){
 		var int tests = 1000;
 		var int size = 50;
 
@@ -109,5 +109,6 @@ struct Main {
 				}
 			}
 		}
+		return 0;
 	};
 }
