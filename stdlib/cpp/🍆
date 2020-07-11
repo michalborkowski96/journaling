@@ -706,6 +706,18 @@ namespace 🍆 {
 				return result;
 			})));
 		}
+
+		template<typename F, typename... Args>
+		static std::invoke_result_t<F, Args...> lazy_call_static(F&& function, Args&... args) {
+			using return_type = std::invoke_result_t<F, Args...>;
+			using function_result_type = std::conditional_t<std::is_same_v<return_type, StrongObject<Integer>>, StrongObject<Integer>, StrongObjectImpl>;
+			return return_type(std::make_unique<std::function<function_result_type()>>(wrap_lambda([function{std::move(function)}, captured_args{capture(args...)}]()mutable->function_result_type{
+				auto old_arg_tags = std::apply([](auto&... ar){return Journal::get_tags(ar...);}, captured_args);
+				auto result = std::apply([&function](auto&... ar)mutable{return function(ar...);}, captured_get(captured_args));
+				goto_tags(old_arg_tags, captured_args);
+				return result;
+			})));
+		}
 	};
 
 	template<typename T>
@@ -719,8 +731,13 @@ namespace 🍆 {
 	}
 
 	template<typename T, typename F, typename... Args>
-	std::invoke_result_t<F, StrongObject<T>, Args...> lazy_call(StrongObject<T> obj, F function, Args&&... args) {
-		return Journal::lazy_call(obj, std::move(function), args...);
+	std::invoke_result_t<F, StrongObject<T>, Args...> lazy_call(StrongObject<T> obj, F&& function, Args&&... args) {
+		return Journal::lazy_call(obj, std::forward<F>(function), args...);
+	}
+
+	template<typename F, typename... Args>
+	std::invoke_result_t<F, Args...> lazy_call_static(F&& function, Args&&... args) {
+		return Journal::lazy_call_static(std::forward<F>(function), args...);
 	}
 }
 

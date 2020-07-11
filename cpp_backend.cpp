@@ -280,7 +280,11 @@ public:
 			default:
 				throw std::runtime_error("Internal error.");
 			}
-			if(function_name != nullptr) {
+			if(e->type == BinaryOperationType::OR || e->type == BinaryOperationType::AND) {
+				print_data("->fun_", function_name, u8"(🍆::lazy_call_static([=]()mutable{return ");
+				print_expression(e->right, parameters);
+				print_data(";}))");
+			} else if(function_name != nullptr) {
 				print_data("->fun_", function_name, "(");
 				print_expression(e->right, parameters);
 				print_data(")");

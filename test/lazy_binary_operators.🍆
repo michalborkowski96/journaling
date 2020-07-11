@@ -1,0 +1,45 @@
+import !"vector.🍆"
+
+struct A {
+	strong OutputStream out;
+	constructor(){
+		out = new StdOut();
+	};
+	fun A get() {
+		out.print_string_ln("get!");
+		return this;
+	};
+	fun A alt(A o) {
+		return this;
+	};
+	fun A con(A o) {
+		return this;
+	};
+}
+
+struct Main {
+	strong OutputStream out;
+	constructor(){
+		out = new StdOut();
+	};
+
+	fun int print(String str){
+		out.print_string_ln(str);
+		return 1;
+	};
+
+	fun int main(){
+		if(1 || print("err1")) {
+			if(0 && print("err2")) {
+				print("bug");
+			}
+			print("done");
+		}
+
+		var A a = new A();
+		a = a || a.get();
+		a = a && a.get();
+
+		return 0;
+	};
+}
