@@ -84,10 +84,32 @@ public:
 		), t);
 	}
 
+	void print_type(const Type& t, const std::map<std::string, const TypeInfo*>& parameters) {
+		return std::visit(overload(
+		[&](const VoidType&){
+			o << "void";
+		},
+		[&](const VariableType& vt){
+			print_type(vt, parameters);
+		}
+		), t);
+	}
+
 	void print_owned_type(const VariableType& type, const std::map<std::string, const TypeInfo*>& parameters) {
 		print_data(u8"🍆::StrongObject<");
 		print_type(type, parameters);
 		print_data('>');
+	}
+
+	void print_owned_type(const Type& type, const std::map<std::string, const TypeInfo*>& parameters) {
+		return std::visit(overload(
+		[&](const VoidType&){
+			o << "void";
+		},
+		[&](const VariableType& vt){
+			print_owned_type(vt, parameters);
+		}
+		), type);
 	}
 
 	void print_owned_type(const TypeInfo* type) {
@@ -144,6 +166,41 @@ public:
 		},
 		[&](const std::unique_ptr<Identifier>& e){
 			print_data("var_", *e);
+		},
+		[&](const std::unique_ptr<Lambda>& e){
+			print_data(u8"🍆::make_object<Type_Function", e->arguments.size(), '<');
+			print_type(e->return_type, parameters);
+			for(const auto&[type, name] : e->arguments) {
+				print_data(", ");
+				print_type(type, parameters);
+			}
+			print_data(">>([");
+			if(!e->capture.empty()) {
+				print_data("var_", e->capture[0].first.name, "{🍆::strongify(var_", e->capture[0].first.name, ")}");
+			}
+			for(size_t i = 1; i < e->capture.size(); ++i) {
+				print_data(", var_", e->capture[i].first.name, "{🍆::strongify(var_", e->capture[i].first.name, ")}");
+			}
+			print_data("](");
+			{
+				if(!e->arguments.empty()) {
+					print_owned_type(e->arguments[0].first, parameters);
+					print_data(" var_", e->arguments[0].second.name);
+				}
+				for(size_t i = 1; i < e->arguments.size(); ++i) {
+					print_data(", ");
+					print_owned_type(e->arguments[i].first, parameters);
+					print_data(" var_", e->arguments[i].second.name);
+				}
+			}
+			print_data(") mutable ");
+			print_block(*e->body, parameters);
+			for(const auto&[var, ct] : e->capture) {
+				if(ct == Lambda::CaptureType::JOURNAL) {
+					print_data(", var_", var.name);
+				}
+			}
+			print_data(")");
 		},
 		[&](const std::unique_ptr<New>& e){
 			print_data(u8"🍆::make_object<");

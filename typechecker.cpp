@@ -102,21 +102,6 @@ bool TypeInfo::implicitly_convertible_from(const FunctionalTypeInfo*) const {
 	return false;
 }
 
-bool TypeInfo::requires_call_nojournal_marks() const {
-	return false;
-}
-
-bool TypeInfo::forbids_call_nojournal_marks() const {
-	return false;
-}
-
-bool RealFunctionInfo::requires_call_nojournal_marks() const {
-	return nojournal_marks;
-}
-bool RealFunctionInfo::forbids_call_nojournal_marks() const {
-	return !nojournal_marks;
-}
-
 bool TypeInfo::extendable() const {
 	return false;
 }
@@ -296,12 +281,6 @@ public:
 		return arg ? std::string("int ") + name + "(int)" : std::string("int ") + name + "()";
 	}
 	virtual ~BuiltinIntFunctionInfo() = default;
-	virtual bool requires_call_nojournal_marks() const override {
-		return true;
-	}
-	virtual bool forbids_call_nojournal_marks() const override {
-		return false;
-	}
 };
 
 class FunctionalTypeInfo : public TypeInfo {
@@ -335,13 +314,6 @@ public:
 	}
 	virtual std::optional<const TypeInfo*> call_with(const std::vector<const TypeInfo*>& args) const override {
 		return fi->call_with(args);
-	}
-	virtual bool requires_call_nojournal_marks() const override {
-		return fi->requires_call_nojournal_marks();
-	}
-
-	virtual bool forbids_call_nojournal_marks() const override {
-		return fi->forbids_call_nojournal_marks();
 	}
 	virtual ~FunctionalTypeInfo() = default;
 };
@@ -519,12 +491,6 @@ public:
 		return fi.full_name();
 	}
 	virtual ~PrivateContextFunctionInfo() = default;
-	virtual bool requires_call_nojournal_marks() const override {
-		return false;
-	}
-	virtual bool forbids_call_nojournal_marks() const override {
-		return true;
-	}
 };
 
 bool RealClassInfo::implicitly_convertible_from(const RealClassInfo* o) const {
@@ -572,6 +538,9 @@ bool RealClassInfo::constructible_with(const std::vector<const TypeInfo*>& args)
 const std::string& RealClassInfo::pattern_name() const {
 	return ast_data->name.name;
 }
+bool RealClassInfo::has_nojournal_mark() const {
+	return ast_data->nojournal;
+}
 std::optional<const TypeInfo*> RealClassInfo::get_member(const std::string& name) const {
 	if(ast_data->public_variables) {
 		auto v = variables.find(name);
@@ -595,7 +564,6 @@ bool RealClassInfo::check_nojournal_mark(bool mark) const {
 bool RealClassInfo::extendable() const {
 	return !ast_data->public_variables;
 }
-
 std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, std::vector<TypeError>> RealClassInfo::make_class(ClassDatabase& class_database, const Class* ast) {
 	std::vector<TypeError> errors;
 	if(ast->parameters.empty() && !ast->optional_functions.empty()) {
@@ -633,7 +601,7 @@ std::variant<std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>>, 
 
 		if(ast->name.name == "JournalTag" && parameters.size() == 1) {
 			const RealClassInfo* rci = dynamic_cast<const RealClassInfo*>(parameters.front());
-			if(rci && rci->ast_data->nojournal) {
+			if(rci && rci->has_nojournal_mark()) {
 				errors.emplace_back(ast->parameters.front(), "JournalTag can be instantiated only with journalable types and 'int'.");
 			}
 		}
@@ -1042,6 +1010,78 @@ std::optional<ExpressionCheckResult> check_expression(std::vector<TypeError>& er
 	[&](const std::unique_ptr<IntegerLiteral>&)->std::optional<ExpressionCheckResult>{
 		return ExpressionCheckResult(class_database.get_for_int(), false);
 	},
+	[&](const std::unique_ptr<Lambda>& l)->std::optional<ExpressionCheckResult>{
+		VariableMap inner(std::nullopt);
+		for(const auto&[var, capture_type] : l->capture) {
+			if(variable_map.has(var.name)) {
+				const TypeInfo* type = variable_map.at(var.name);
+				const RealClassInfo* rci = dynamic_cast<const RealClassInfo*>(type);
+				if(capture_type == Lambda::CaptureType::JOURNAL && rci && rci->has_nojournal_mark()) {
+					errors.emplace_back(var, "Journal capture requested for a type that doesn't support it.");
+				}
+				if(!type->implicitly_convertible_to(type)) {
+					errors.emplace_back(var, "Type " + type->full_name() + " cannot be captured.");
+				} else if(!inner.try_add(var.name, type)) {
+					errors.emplace_back(var, "Capture redefinition.");
+				}
+			} else {
+				errors.emplace_back(var, "Identifier not found in current context.");
+			}
+		}
+		std::vector<const TypeInfo*> arguments;
+		for(const auto&[type, name] : l->arguments) {
+			std::visit(overload([&, &name = name](const TypeInfo* type_info){
+				if(!inner.try_add(name.name, type_info)) {
+					errors.emplace_back(name, "Variable redefinition.");
+				} else {
+					arguments.push_back(type_info);
+				}
+			}, [&](std::vector<TypeError>&& e) {
+				for(TypeError& ee : e) {
+					errors.push_back(std::move(ee));
+				}
+			}), class_database.get(type));
+		}
+		const TypeInfo* return_type = nullptr;
+		std::visit(overload([&](const TypeInfo* type_info){
+			return_type = type_info;
+		}, [&](std::vector<TypeError>&& e) {
+			for(TypeError& ee : e) {
+				errors.push_back(std::move(ee));
+			}
+		}), class_database.get(l->return_type));
+		if(return_type) {
+			std::optional<std::vector<TypeError>> r = check_function_block(return_type, std::nullopt, inner, class_database, *l->body);
+			if(r) {
+				for(TypeError& ee : *r) {
+					errors.push_back(std::move(ee));
+				}
+			}
+		}
+		size_t args_begin = l->body->begin;
+		size_t args_end = args_begin;
+		if(!l->arguments.empty()) {
+			args_begin = std::visit([](const auto& r){return r.begin;}, l->arguments.front().first);
+			args_end = l->arguments.back().second.end;
+		}
+		if(return_type && arguments.size() == l->arguments.size()) {
+			const TypeInfo* functional_type = nullptr;
+			std::visit(overload([&](const TypeInfo* type_info){
+				functional_type = type_info;
+			}, [&](std::vector<TypeError>&& e) {
+				for(TypeError& ee : e) {
+					errors.push_back(std::move(ee));
+				}
+			}), class_database.get_functional(args_begin, args_end, return_type, arguments));
+			if(functional_type) {
+					return ExpressionCheckResult(functional_type, false);
+			} else {
+				return std::nullopt;
+			}
+		} else {
+			return std::nullopt;
+		}
+	},
 	[&](const std::unique_ptr<Identifier>& e)->std::optional<ExpressionCheckResult>{
 		if(!variable_map.has(e->name)) {
 			errors.emplace_back(*e, "Identifier not found in current context.");
@@ -1062,12 +1102,10 @@ std::optional<ExpressionCheckResult> check_expression(std::vector<TypeError>& er
 				args.push_back(type->type_info());
 			}
 		}
-		if(t->constructible_with(args)) {
-			return ExpressionCheckResult(t, false);
-		} else {
+		if(!t->constructible_with(args)) {
 			errors.emplace_back(*e, "Type " + t->full_name() + " not constructible with arguments (" + types_to_string(args) + ").");
-			return std::nullopt;
 		}
+		return ExpressionCheckResult(t, false);
 	},
 	[&](const std::unique_ptr<Negation>& e)->std::optional<ExpressionCheckResult>{
 		auto t = check_expr(e->value);
@@ -1610,6 +1648,71 @@ ClassDatabase::NonOwnedParameter::~NonOwnedParameter() {
 
 [[nodiscard]] ClassDatabase::NonOwnedParameter ClassDatabase::add_parameter(std::string name, const TypeInfo* type) {
 	return NonOwnedParameter(this, move(name), type);
+}
+
+std::variant<const TypeInfo*, std::vector<TypeError>> ClassDatabase::get_functional(size_t args_begin, size_t args_end, const TypeInfo* return_type, const std::vector<const TypeInfo*>& arguments) {
+	std::string pattern_name = "Function" + std::to_string(arguments.size());
+	std::vector<const TypeInfo*> params{return_type};
+	for(const auto ti : arguments) {
+		params.push_back(ti);
+	}
+	{
+		auto tt = types.find(pattern_name);
+		if(tt != types.end()) {
+			auto ttt = tt->second.find(params);
+			if(ttt != tt->second.end()) {
+				return ttt->second.get();
+			}
+		}
+	}
+	auto pattern = patterns.find(pattern_name);
+	if(pattern == patterns.end()) {
+		return std::vector<TypeError>{TypeError(args_begin, args_end, "Pattern '" + pattern_name + "' not found in current context. Please use the 'function' library and make sure it has declarations with enough arguments.")};
+	}
+	if(pattern->second.first->parameters.size() != params.size()) {
+		return std::vector<TypeError>{TypeError(args_begin, args_end, "Pattern '" + pattern_name + "' takes " + std::to_string(pattern->second.first->parameters.size()) + " arguments, not " + std::to_string(params.size()) + ". This is a bug in the standard library. Did you mess with it?")};
+	}
+
+	std::map<std::string, const TypeInfo*> old_parameters = move(current_class_parameters);
+
+	for(size_t i = 0; i < params.size(); ++i) {
+		current_class_parameters.emplace(pattern->second.first->parameters[i].name, params[i]);
+	}
+
+	std::shared_ptr<const std::string> context = std::make_shared<std::string>("During instatiation of the pattern " + pattern_name + " with parameters <" + types_to_string(params) + ">.");
+
+	std::shared_ptr<const std::string> filename = pattern->second.second;
+
+	size_t optional_error_count = optional_errors.size();
+
+	return std::visit(overload(
+		[&](std::pair<std::unique_ptr<RealClassInfo>, std::vector<TypeError>> r)->std::variant<const TypeInfo*, std::vector<TypeError>>{
+			current_class_parameters = move(old_parameters);
+			for(TypeError& oe : r.second) {
+				oe.fill_filename_if_empty(filename);
+				optional_errors.push_back(std::move(oe));
+			}
+			for(size_t i = optional_error_count; i < optional_errors.size(); ++i) {
+				optional_errors[i].add_context(context);
+			}
+			RealClassInfo* ci = r.first.get();
+			if(!ci->has_unknown_parameters()) {
+				classes_order.push_back(ci);
+				types[pattern_name][params] = std::move(r.first);
+			} else {
+				temporary_types_with_unknown_parameters.push_back(std::move(r.first));
+			}
+			return ci;
+		},
+		[&](std::vector<TypeError> e)->std::variant<const TypeInfo*, std::vector<TypeError>>{
+			current_class_parameters = move(old_parameters);
+			for(TypeError& oe : e) {
+				oe.fill_filename_if_empty(filename);
+				oe.add_context(context);
+			}
+			return e;
+		}
+		), RealClassInfo::make_class(*this, pattern->second.first));
 }
 
 std::variant<const TypeInfo*, std::vector<TypeError>> ClassDatabase::get(const PointerType& t) {

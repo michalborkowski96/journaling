@@ -73,3 +73,5 @@ Class::Class(size_t begin, size_t end, Identifier&& name, std::vector<Function>&
 Module::Module(std::vector<Import>&& imports, std::vector<Class>&& classes) : imports(std::move(imports)), classes(std::move(classes)) {}
 
 Module::Import::Import(std::string path, bool standard) : path(std::move(path)), standard(standard) {}
+
+Lambda::Lambda(size_t begin, size_t end, std::vector<std::pair<Identifier, CaptureType>> capture, std::vector<std::pair<VariableType, Identifier>> arguments, VariableType return_type, std::unique_ptr<Block>&& body) : AstNode(begin, end), capture(std::move(capture)), arguments(std::move(arguments)), return_type(std::move(return_type)), body(std::move(body)) {}

@@ -73,8 +73,6 @@ public:
 	bool explicitly_convertible_to(const TypeInfo* o) const;
 	bool comparable_with(const TypeInfo* o) const;
 	friend void print(std::ostream&, const std::vector<const RealClassInfo*>&, const std::filesystem::path& path_to_cpp_library);
-	virtual bool requires_call_nojournal_marks() const;
-	virtual bool forbids_call_nojournal_marks() const;
 };
 
 class FunctionInfo {
@@ -88,8 +86,6 @@ public:
 	virtual std::optional<const TypeInfo*> call_with(const std::vector<const TypeInfo*>& args) const = 0;
 	virtual std::string full_name() const = 0;
 	virtual ~FunctionInfo() = default;
-	virtual bool requires_call_nojournal_marks() const = 0;
-	virtual bool forbids_call_nojournal_marks() const = 0;
 };
 
 class VariableMap {
@@ -140,6 +136,7 @@ public:
 	std::variant<const TypeInfo*, std::vector<TypeError>> get(const ast::Type& t);
 	std::variant<const TypeInfo*, std::vector<TypeError>> get(const ast::VariableType& t);
 	std::variant<const TypeInfo*, std::vector<TypeError>> get(const ast::PointerType& t);
+	std::variant<const TypeInfo*, std::vector<TypeError>> get_functional(size_t args_begin, size_t args_end, const TypeInfo* return_type, const std::vector<const TypeInfo*>& arguments);
 	[[nodiscard]] NonOwnedParameter add_parameter(std::string name, const TypeInfo*);
 	const std::vector<const RealClassInfo*>& get_ordered() const;
 };
@@ -166,8 +163,6 @@ public:
 	std::optional<std::vector<TypeError>> check_body(VariableMap& variable_map, ClassDatabase& class_database) const;
 	virtual ~RealFunctionInfo() = default;
 	friend struct RealFunctionInfoView;
-	virtual bool requires_call_nojournal_marks() const override;
-	virtual bool forbids_call_nojournal_marks() const override;
 };
 
 struct RealFunctionInfoView {
@@ -211,6 +206,7 @@ public:
 	bool has_unknown_parameters() const;
 	bool comes_from_same_pattern(const RealClassInfo& o) const;
 	friend struct RealClassInfoView;
+	bool has_nojournal_mark() const;
 };
 
 struct RealClassInfoView {

@@ -17,6 +17,11 @@ namespace 🍆 {
 		using std::remove_reference_t<Fs>::operator()...;
 	};
 
+	template<typename F>
+	static auto wrap_lambda(F&& lambda) {
+		return [f{std::make_shared<std::remove_cv_t<F>>(std::forward<F>(lambda))}](auto&&... args){return (*f)(std::forward<decltype(args)>(args)...);};
+	}
+
 	class Null {};
 
 	Null null;
@@ -238,7 +243,8 @@ namespace 🍆 {
 	template<typename T>
 	class StrongObject {
 		StrongObjectImpl obj;
-		friend class WeakObject<T>;
+		template<typename U>
+		friend class WeakObject;
 		template<typename U>
 		friend class StrongObject;
 	public:
@@ -251,7 +257,6 @@ namespace 🍆 {
 		}
 		StrongObject(const Null&) {}
 		StrongObject() = default;
-		StrongObject(const WeakObject<T>& o);
 		StrongObject(StrongObjectImpl o) : obj(std::move(o)) {}
 		template<typename U, std::enable_if_t<std::is_convertible<U*, T*>::value, int> = 0>
 		StrongObject(StrongObject<U> o) : obj(o.obj) {}
@@ -326,9 +331,14 @@ namespace 🍆 {
 		WeakObject(const Null&) {}
 		WeakObject(WeakObjectImpl obj) : obj(obj) {}
 		WeakObject() {}
-		WeakObject(const StrongObject<T>& o) : obj(o.obj) {}
 		template<typename U, std::enable_if_t<std::is_convertible<U*, T*>::value, int> = 0>
 		WeakObject(WeakObject<U> o) : obj(o.obj) {}
+		template<typename U, std::enable_if_t<std::is_convertible<U*, T*>::value, int> = 0>
+		WeakObject(StrongObject<U> o) : obj(o.obj) {}
+		template<typename U, std::enable_if_t<std::is_convertible<T*, U*>::value, int> = 0>
+		operator StrongObject<U>() {
+			return StrongObject<U>(obj);
+		}
 		StrongObject<Integer> operator==(StrongObject<T> b) {
 			return StrongObject<T>(*this) == b;
 		}
@@ -343,9 +353,6 @@ namespace 🍆 {
 
 	template<>
 	class WeakObject<Integer>;
-
-	template<typename T>
-	StrongObject<T>::StrongObject(const WeakObject<T>& o) : obj(o.obj) {}
 
 	template<typename T, typename... Ts>
 	StrongObject<T> make_object(Ts&&... args) {
@@ -583,11 +590,6 @@ namespace 🍆 {
 		template<typename... Args>
 		static void goto_tags(const std::array<std::optional<Tag>, count_types_with_journal<Args...>::value>& tags, std::tuple<Captured<Args>...>& args) {
 			std::apply([&tags](auto&... a){goto_tags_do<0>(tags, a...);}, args);
-		}
-
-		template<typename F>
-		static std::function<std::invoke_result_t<F>()> wrap_lambda(F&& lambda) {
-			return [f{std::make_shared<std::remove_cv_t<F>>(std::forward<F>(lambda))}](){return (*f)();};
 		}
 
 		void add_new_vertex(std::function<void()> there, std::function<void()> back) {

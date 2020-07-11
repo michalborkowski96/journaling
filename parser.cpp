@@ -99,6 +99,38 @@ namespace {
 			std::optional<Expression> expression;
 			size_t begin = tokens[pos].begin;
 			expect(
+			LexemeType::SQUARE_OPEN, [&](){
+				std::vector<std::pair<Identifier, Lambda::CaptureType>> capture;
+				++pos;
+				if(tokens[pos].type != LexemeType::SQUARE_CLOSE) {
+					while(true) {
+						std::string capture_type = parse_identifier().name;
+						Lambda::CaptureType ct;
+						if(capture_type == "j") {
+							ct = Lambda::CaptureType::JOURNAL;
+						} else if (capture_type == "r") {
+							ct = Lambda::CaptureType::REFERENCE;
+						} else {
+							--pos;
+							throw error();
+						}
+						capture.emplace_back(parse_identifier(), ct);
+						if(tokens[pos].type == LexemeType::COMMA) {
+							++pos;
+							continue;
+						}
+						if(tokens[pos].type == LexemeType::SQUARE_CLOSE) {
+							break;
+						}
+						throw error();
+					}
+				}
+				++pos;
+				auto args = parse_function_declaration_args();
+				VariableType type = parse_variable_type();
+				std::unique_ptr<Block> body = std::make_unique<Block>(parse_block());
+				expression = std::make_unique<Lambda>(begin, tokens[pos - 1].end, std::move(capture), std::move(args), std::move(type), std::move(body));
+			},
 			LexemeType::STRING_LITERAL, [&]() {
 				std::string str = parse_string();
 				expression = std::make_unique<StringLiteral>(begin, tokens[pos - 1].end, move(str));

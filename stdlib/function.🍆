@@ -1,0 +1,49 @@
+nojournal Function0 R {
+	constructor(){};
+	fun R call(){return null;};
+}
+
+nojournal Function1 R A1 {
+	constructor(){};
+	fun R call(A1 a1){return null;};
+}
+
+nojournal Function2 R A1 A2 {
+	constructor(){};
+	fun R call(A1 a1, A2 a2){return null;};
+}
+
+nojournal Function3 R A1 A2 A3 {
+	constructor(){};
+	fun R call(A1 a1, A2 a2, A3 a3){return null;};
+}
+
+nojournal Function4 R A1 A2 A3 A4 {
+	constructor(){};
+	fun R call(A1 a1, A2 a2, A3 a3, A4 a4){return null;};
+}
+
+nojournal Function5 R A1 A2 A3 A4 A5 {
+	constructor(){};
+	fun R call(A1 a1, A2 a2, A3 a3, A4 a4, A5 a5){return null;};
+}
+
+nojournal Function6 R A1 A2 A3 A4 A5 A6 {
+	constructor(){};
+	fun R call(A1 a1, A2 a2, A3 a3, A4 a4, A5 a5, A6 a6){return null;};
+}
+
+nojournal Function7 R A1 A2 A3 A4 A5 A6 A7 {
+	constructor(){};
+	fun R call(A1 a1, A2 a2, A3 a3, A4 a4, A5 a5, A6 a6, A7 a7){return null;};
+}
+
+nojournal Function8 R A1 A2 A3 A4 A5 A6 A7 A8 {
+	constructor(){};
+	fun R call(A1 a1, A2 a2, A3 a3, A4 a4, A5 a5, A6 a6, A7 a7, A8 a8){return null;};
+}
+
+nojournal Function9 R A1 A2 A3 A4 A5 A6 A7 A8 A9 {
+	constructor(){};
+	fun R call(A1 a1, A2 a2, A3 a3, A4 a4, A5 a5, A6 a6, A7 a7, A8 a8, A9 a9){return null;};
+}

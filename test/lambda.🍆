@@ -1,0 +1,20 @@
+import !"iostream.🍆"
+import !"function.🍆"
+import !"vector.🍆"
+
+struct Main {
+	strong OutputStream out;
+	constructor(){
+		out = new StdOut();
+	};
+	fun int main(){
+		var Vector<int> ints = new Vector<int>();
+		ints.push_back(-4);
+		auto l1 = [j ints](int a)int{return ints.at(0) + a;};
+		auto l2 = [r ints](int a)int{return ints.at(0) + a;};
+		ints.push_front(90);
+		out.print_int_ln(l1.call(7));
+		out.print_int_ln(l2.call(7));
+		return 0;
+	};
+}

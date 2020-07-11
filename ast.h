@@ -72,7 +72,9 @@ namespace ast {
 
 		struct New;
 
-		using Expression = Wrap<std::variant, std::unique_ptr, StringLiteral, IntegerLiteral, Identifier, New, Negation, Cast, Null, This, MemberAccess, FunctionCall, BinaryOperation>;
+		struct Lambda;
+
+		using Expression = Wrap<std::variant, std::unique_ptr, Lambda, StringLiteral, IntegerLiteral, Identifier, New, Negation, Cast, Null, This, MemberAccess, FunctionCall, BinaryOperation>;
 
 		struct StringLiteral : public AstNode {
 			std::string value;
@@ -133,7 +135,6 @@ namespace ast {
 			BinaryOperationType type;
 			BinaryOperation(size_t begin, size_t end, Expression left, Expression right, BinaryOperationType type);
 		};
-
 	}
 
 	namespace statement {
@@ -230,6 +231,19 @@ namespace ast {
 			expression::Expression expression;
 			StatementExpression(size_t begin, size_t end, expression::Expression expression);
 		};
+	}
+
+	namespace expression {
+	struct Lambda : public AstNode {
+		enum class CaptureType {
+			JOURNAL, REFERENCE
+		};
+		std::vector<std::pair<Identifier, CaptureType>> capture;
+		std::vector<std::pair<VariableType, Identifier>> arguments;
+		VariableType return_type;
+		std::unique_ptr<statement::Block> body;
+		Lambda(size_t begin, size_t end, std::vector<std::pair<Identifier, CaptureType>> capture, std::vector<std::pair<VariableType, Identifier>> arguments, VariableType return_type, std::unique_ptr<statement::Block>&& body);
+	};
 	}
 
 	enum class FunctionKind {
