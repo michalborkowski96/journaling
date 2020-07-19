@@ -86,7 +86,11 @@ public: \
 	Type_StdIn(const Type_StdIn&) = delete; \
 	Type_StdIn(Type_StdIn&&) = delete; \
 	auto basefun_get_char() { \
-		return std::make_tuple(🍆::StrongObject<🍆::Integer>(std::cin.get())); \
+		int c = std::cin.get();\
+		if(c == std::char_traits<wchar_t>::eof()) {\
+			c = -1;\
+		}\
+		return std::make_tuple(🍆::StrongObject<🍆::Integer>(c)); \
 	} \
 	virtual 🍆::StrongObject<🍆::Integer> privfun_get_char() { \
 		return std::get<0>(basefun_get_char()); \
