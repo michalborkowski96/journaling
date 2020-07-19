@@ -24,4 +24,16 @@ abstract nojournal InputStream {
 	fun int get_char();
 	fun int get_int();
 	fun String get_string();
+	fun String get_everything() {
+		var int c;
+		var String result = "";
+		while(1) {
+			c = get_char();
+			if(c == -1) {
+				break;
+			}
+			result.resize(result.size() + 1, c);
+		}
+		return result;
+	};
 }
