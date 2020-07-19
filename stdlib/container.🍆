@@ -134,6 +134,14 @@ abstract OrderedContainer Element Iterator : Container<Element, Iterator> {
 		return e;
 	} auto;
 
+	fun Element front() {
+		return begin().deref();
+	} noeffect;
+
+	fun Element back() {
+		return end().prev().deref();
+	} noeffect;
+
 	fun void push_front(Element e) {
 		this.insert(begin(), e);
 	} auto;
