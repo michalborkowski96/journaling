@@ -139,7 +139,8 @@ public: \
 		return std::get<0>(basefun_size()); \
 	} \
 	auto basefun_substr(🍆::StrongObject<🍆::Integer> var_pos, 🍆::StrongObject<🍆::Integer> var_len) { \
-		return std::make_tuple(🍆::make_object<Type_String>(data.substr(var_pos->to_ll(), var_len->to_ll()))); \
+		long long pos = var_pos->to_ll(); \
+		return std::make_tuple(🍆::make_object<Type_String>(pos < data.size() ? data.substr(var_pos->to_ll(), var_len->to_ll()) : std::string{})); \
 	} \
 	virtual 🍆::StrongObject<Type_String> privfun_substr(🍆::StrongObject<🍆::Integer> var_pos, 🍆::StrongObject<🍆::Integer> var_len) { \
 		return std::get<0>(basefun_substr(var_pos, var_len)); \
