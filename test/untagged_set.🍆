@@ -76,7 +76,7 @@ struct Main {
 					out.print_newline();
 					ints.print(out);
 					out.print_newline();
-					return;
+					return 0;
 				}
 			}
 			auto pre_check = new JournalTag<Vector<Integer>>(history);
@@ -105,7 +105,7 @@ struct Main {
 					out.print_newline();
 					ints.print(out);
 					out.print_newline();
-					return;
+					return 0;
 				}
 			}
 		}

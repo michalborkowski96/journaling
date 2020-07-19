@@ -9,6 +9,9 @@ nojournal FListInt {
 		out.print_string("{");
 		auto n = this;
 		while(n != null) {
+			if(n.get_num() == 50) {
+				break;
+			}
 			out.print_int(n.get_num());
 			out.print_string(", ");
 			n = n.get_next();

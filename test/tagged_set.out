@@ -1,0 +1,14 @@
+{1, 4}
+{1, 2}
+{1, 4}
+
+{bb, cc, dd}
+{ee, cc, dd}
+{aa, ee, cc, dd}
+{aa, ee, cc, dd, ee}
+{aa, bb, cc, dd, ee}
+{aa, ee, cc, dd, ee}
+{aa, cc, dd, ee}
+{aa, cc, dd}
+{}
+{aa, cc, dd}
