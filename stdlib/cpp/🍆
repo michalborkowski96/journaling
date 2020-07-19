@@ -9,6 +9,11 @@
 #include <memory>
 #include <type_traits>
 #include <tuple>
+#include <cstring>
+
+#ifndef O_NO_LAZY_INT
+#define O_NO_LAZY_INT 0
+#endif
 
 namespace 🍆 {
 	template <typename... Fs>
@@ -33,14 +38,20 @@ namespace 🍆 {
 
 	template<>
 	class StrongObject<Integer> {
+#if O_NO_LAZY_INT
+		long long value;
+#else
 		std::shared_ptr<std::variant<long long, std::unique_ptr<std::function<StrongObject<Integer>()>>>> value;
+#endif
 	public:
 		using element_type = Integer;
 		StrongObject<Integer>();
 		StrongObject<Integer>(const Null&);
 		StrongObject<Integer>(Integer value);
 		StrongObject<Integer>(long long value);
+#if !O_NO_LAZY_INT
 		StrongObject<Integer>(std::unique_ptr<std::function<StrongObject<Integer>()>> fun) : value(std::make_shared<std::variant<long long, std::unique_ptr<std::function<StrongObject<Integer>()>>>>(std::move(fun))) {}
+#endif
 
 		Integer& operator*();
 		Integer* operator->();
@@ -50,6 +61,9 @@ namespace 🍆 {
 		explicit operator bool();
 
 		long long& get_value() {
+#if O_NO_LAZY_INT
+			return value;
+#else
 			return std::visit(overload(
 			[](long long& v)->long long&{return v;},
 			[&](std::unique_ptr<std::function<StrongObject<Integer>()>>& f)->long long&{
@@ -61,6 +75,7 @@ namespace 🍆 {
 				return std::get<long long>(*value);
 			}
 			), *value);
+#endif
 		}
 
 		friend class Integer;
@@ -124,7 +139,15 @@ namespace 🍆 {
 			return value;
 		}
 	};
+#if O_NO_LAZY_INT
+	StrongObject<Integer>::StrongObject() : value(0LL) {}
 
+	StrongObject<Integer>::StrongObject(const Null&) :  value(0LL) {}
+
+	StrongObject<Integer>::StrongObject(Integer v) :  value(v.to_ll()) {}
+
+	StrongObject<Integer>::StrongObject(long long v) :  value(v) {}
+#else
 	StrongObject<Integer>::StrongObject() : value(std::make_shared<decltype(value)::element_type>(0LL)) {}
 
 	StrongObject<Integer>::StrongObject(const Null&) :  value(std::make_shared<decltype(value)::element_type>(0LL)) {}
@@ -132,7 +155,7 @@ namespace 🍆 {
 	StrongObject<Integer>::StrongObject(Integer v) :  value(std::make_shared<decltype(value)::element_type>(v.to_ll())) {}
 
 	StrongObject<Integer>::StrongObject(long long v) :  value(std::make_shared<decltype(value)::element_type>(v)) {}
-
+#endif
 	Integer& StrongObject<Integer>::operator*() {
 		return *Integer::cast_from(&get_value());
 	}
@@ -140,6 +163,9 @@ namespace 🍆 {
 		return Integer::cast_from(&get_value());
 	}
 	StrongObject<Integer> StrongObject<Integer>::operator==(StrongObject<Integer> b) {
+#if O_NO_LAZY_INT
+		return value == b.value;
+#else
 		return std::visit(overload(
 		[&](long long& v){return v == b.get_value();},
 		[&](std::unique_ptr<std::function<StrongObject<Integer>()>>& fa){
@@ -154,6 +180,7 @@ namespace 🍆 {
 			), *b.value);
 		}
 		), *value);
+#endif
 	}
 	StrongObject<Integer> StrongObject<Integer>::operator!=(StrongObject<Integer> b) {
 		return !(*this == b);
@@ -169,25 +196,25 @@ namespace 🍆 {
 		template<typename U>
 		friend class StrongObject;
 		friend class WeakObjectImpl;
-		static const GroupSharedPointer<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>> null_ptr_var;
-		GroupSharedPointer<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>> obj;
+		static const GroupSharedPointer<std::variant<std::unique_ptr<void, void(*)(void*)>, std::unique_ptr<std::function<StrongObjectImpl()>>>> null_ptr_var;
+		GroupSharedPointer<std::variant<std::unique_ptr<void, void(*)(void*)>, std::unique_ptr<std::function<StrongObjectImpl()>>>> obj;
 	public:
 		StrongObjectImpl(const Null&) : obj(null_ptr_var) {}
 		StrongObjectImpl() : obj(null_ptr_var) {}
 		StrongObjectImpl(const WeakObjectImpl& o);
-		StrongObjectImpl(std::unique_ptr<std::function<StrongObjectImpl()>> o) : obj(new std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>(std::move(o))) {}
+		StrongObjectImpl(std::unique_ptr<std::function<StrongObjectImpl()>> o) : obj(new std::variant<std::unique_ptr<void, void(*)(void*)>, std::unique_ptr<std::function<StrongObjectImpl()>>>(std::move(o))) {}
 
 		StrongObject<Integer> operator==(StrongObjectImpl b) {
 			return std::visit(overload(
-			[&](std::shared_ptr<void>& v){return v == b.get_value();},
+			[&](std::unique_ptr<void, void(*)(void*)>& v){return v.get() == b.get_bare_value();},
 			[&](std::unique_ptr<std::function<StrongObjectImpl()>>& fa){
 				return std::visit(overload(
-				[&](std::shared_ptr<void>& v){return v == get_value();},
+				[&](std::unique_ptr<void, void(*)(void*)>& v){return v.get() == get_bare_value();},
 				[&](std::unique_ptr<std::function<StrongObjectImpl()>>& fb){
 					if(fa == fb) {
 						return true;
 					}
-					return get_value() == b.get_value();
+					return get_bare_value() == b.get_bare_value();
 				}
 				), *b.obj);
 			}
@@ -197,26 +224,28 @@ namespace 🍆 {
 			return !(*this == b);
 		}
 
-		std::shared_ptr<void>& get_value() {
+		void* get_bare_value() {
 			return std::visit(overload(
-			[](std::shared_ptr<void>& v)->std::shared_ptr<void>&{return v;},
-			[&](std::unique_ptr<std::function<StrongObjectImpl()>>& f)->std::shared_ptr<void>&{
+			[](std::unique_ptr<void, void(*)(void*)>& v){return v.get();},
+			[&](std::unique_ptr<std::function<StrongObjectImpl()>>& f){
 				StrongObjectImpl val = (*f)();
-				*obj = val.get_value();
+				void* v = val.get_bare_value();
+				void(*deleter)(void*) = std::get<std::unique_ptr<void, void(*)(void*)>>(*val.obj).get_deleter();
+				std::get<std::unique_ptr<void, void(*)(void*)>>(*val.obj).release();
+				*obj = std::unique_ptr<void, void(*)(void*)>(v, deleter);
 				val.obj.group_assume(obj);
-				return val.get_value();
+				return v;
 			}
 			), *obj);
 		}
 	};
 
-	const GroupSharedPointer<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>> StrongObjectImpl::null_ptr_var(new std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>(std::shared_ptr<void>(nullptr)));
-
+	const GroupSharedPointer<std::variant<std::unique_ptr<void, void(*)(void*)>, std::unique_ptr<std::function<StrongObjectImpl()>>>> StrongObjectImpl::null_ptr_var(new std::variant<std::unique_ptr<void, void(*)(void*)>, std::unique_ptr<std::function<StrongObjectImpl()>>>(std::unique_ptr<void,  void(*)(void*)>(nullptr, nullptr)));
 	class WeakObjectImpl {
 		template<typename U>
 		friend class WeakObject;
 		friend class StrongObjectImpl;
-		GroupWeakPointer<std::variant<std::shared_ptr<void>, std::unique_ptr<std::function<StrongObjectImpl()>>>> obj;
+		GroupWeakPointer<std::variant<std::unique_ptr<void, void(*)(void*)>, std::unique_ptr<std::function<StrongObjectImpl()>>>> obj;
 	public:
 		WeakObjectImpl(const Null&) : obj(StrongObjectImpl::null_ptr_var) {}
 		WeakObjectImpl() : obj(StrongObjectImpl::null_ptr_var) {}
@@ -229,9 +258,9 @@ namespace 🍆 {
 			return !(*this == b);
 		}
 
-		std::shared_ptr<void> get_value() {
+		void* get_bare_value() {
 			auto s = StrongObjectImpl(*this);
-			return s.get_value();
+			return s.get_bare_value();
 		}
 	};
 
@@ -247,13 +276,23 @@ namespace 🍆 {
 		friend class WeakObject;
 		template<typename U>
 		friend class StrongObject;
+
+		static void memory_area_deleter(void* ptr) {
+			delete[](reinterpret_cast<char*>(ptr));
+		}
+
+		static void default_delete_with_memory(void* ptr) {
+			reinterpret_cast<T*>(ptr)->~T();
+			delete[](reinterpret_cast<char*>(ptr));
+		}
+
 	public:
 		using element_type = T;
 		T& operator*() {
-			return *static_cast<T*>(obj.get_value().get());
+			return *static_cast<T*>(obj.get_bare_value());
 		}
 		T* operator->() {
-			return static_cast<T*>(obj.get_value().get());
+			return static_cast<T*>(obj.get_bare_value());
 		}
 		StrongObject(const Null&) {}
 		StrongObject() = default;
@@ -265,15 +304,9 @@ namespace 🍆 {
 		static StrongObject make_object(Ts&&... args) {
 			StrongObject ret;
 			char* memory = new char[sizeof(T)];
-			std::shared_ptr<T> ptr(reinterpret_cast<T*>(memory), std::function<void(T*)>([](T* ptr){
-				delete[](reinterpret_cast<char*>(ptr));
-			}));
-			ret.obj.obj = decltype(ret.obj.obj)(new typename decltype(ret.obj.obj)::element_type(ptr));
+			ret.obj.obj = decltype(ret.obj.obj)(new typename decltype(ret.obj.obj)::element_type(std::unique_ptr<void, void(*)(void*)>(reinterpret_cast<T*>(memory), &memory_area_deleter)));
 			new (reinterpret_cast<T*>(memory)) T(ret, std::forward<Ts>(args)...);
-			*std::get_deleter<std::function<void(T*)>>(ptr) = [](T* ptr){
-				ptr->~T();
-				delete[](reinterpret_cast<char*>(ptr));
-			};
+			std::get<std::unique_ptr<void, void(*)(void*)>>(*ret.obj.obj).get_deleter() = &default_delete_with_memory;
 			return ret;
 		}
 
@@ -284,8 +317,8 @@ namespace 🍆 {
 			return !(*this == b);
 		}
 
-		std::shared_ptr<T> get_value() {
-			return std::static_pointer_cast<T>(obj.get_value());
+		T* get_bare_value() {
+			return static_cast<T*>(obj.get_bare_value());
 		}
 
 		template<typename U>
@@ -310,7 +343,7 @@ namespace 🍆 {
 		}
 
 		explicit operator bool() {
-			return (bool) get_value();
+			return (bool) get_bare_value();
 		}
 	};
 
@@ -323,10 +356,10 @@ namespace 🍆 {
 	public:
 		using element_type = T;
 		T& operator*() {
-			return *static_cast<T*>(obj.get_value().get());
+			return *get_bare_value();
 		}
 		T* operator->() {
-			return static_cast<T*>(obj.get_value().get());
+			return get_bare_value();
 		}
 		WeakObject(const Null&) {}
 		WeakObject(WeakObjectImpl obj) : obj(obj) {}
@@ -346,8 +379,8 @@ namespace 🍆 {
 			return !(*this == b);
 		}
 
-		std::shared_ptr<T> get_value() {
-			return std::static_pointer_cast<T>(obj.get_value());
+		T* get_bare_value() {
+			return static_cast<T*>(obj.get_bare_value());
 		}
 	};
 
